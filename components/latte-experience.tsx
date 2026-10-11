@@ -95,11 +95,11 @@ export function LatteExperience() {
   return (
     <main
       className={`experience ${drink.served ? 'is-served' : ''} ${focused ? 'cup-focus' : ''}`}
-      aria-label="Kopi / Teh interactive drink maker"
+      aria-label="Kopi Tehory interactive drink maker"
     >
       <header className="masthead">
         <p className="wordmark">
-          Kopi <i>/</i> Teh
+          Kopi <i>Tehory</i>
         </p>
         <p className="ritual">A familiar ritual. Your own proportions.</p>
         <div className="header-actions">

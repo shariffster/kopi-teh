@@ -1,4 +1,4 @@
-# Kopi / Teh
+# Kopi Tehory
 
 A tactile drink-making prototype: stir an original finished latte, deliberately start a new kopi or teh, change the proportions, shape the milk surface and serve your own cup. Built for the Common Ground Makeathon on 11 October 2026.
 
