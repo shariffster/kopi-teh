@@ -150,6 +150,7 @@ export class BeverageSimulation {
     phase: number,
     sugar: boolean,
     preserveSurfaceColor = false,
+    viscosity = 0,
   ) {
     this.gpu.draw(this.programs.POUR, this.pigment.write, {
       source: this.pigment.read.texture,
@@ -159,6 +160,7 @@ export class BeverageSimulation {
       strength,
       phase,
       sugar: sugar ? 1 : 0,
+      viscosity,
     });
     this.pigment.swap();
     // The new material is authoritative. Update current mean promptly so the

@@ -186,53 +186,6 @@ dd {
   color: #5a4635;
   letter-spacing: 0.025em;
 }
-.pour-stream {
-  position: absolute;
-  left: 42%;
-  top: 0;
-  width: 7px;
-  height: 55%;
-  pointer-events: none;
-  transform: translateX(-50%);
-  background: linear-gradient(
-    90deg,
-    transparent,
-    var(--pour-color) 25%,
-    #fff8de99 50%,
-    var(--pour-color) 80%,
-    transparent
-  );
-  opacity: 0.9;
-  animation: pour-arrives 0.22s ease-out;
-  filter: blur(0.35px);
-  border-radius: 0 0 50% 50%;
-  transform-origin: top;
-}
-.stream-sugar {
-  width: 12px;
-  background: repeating-linear-gradient(
-    0deg,
-    transparent 0 5px,
-    #fffaed 6px 8px
-  );
-  animation: sugar-fall 0.24s linear infinite;
-}
-.stream-water {
-  opacity: 0.35;
-}
-@keyframes pour-arrives {
-  from {
-    transform: translateX(-50%) scaleY(0);
-  }
-  to {
-    transform: translateX(-50%) scaleY(1);
-  }
-}
-@keyframes sugar-fall {
-  to {
-    background-position-y: 16px;
-  }
-}
 .ingredient-shelf {
   position: absolute;
   top: 118px;
@@ -1605,5 +1558,252 @@ h1 em {
 @media (max-width: 760px) {
   .experience:not(.cup-focus) .photograph {
     margin-bottom: 34px;
+  }
+}
+
+/* Pour lab: the ingredient arrives from a source, then joins the surface. */
+.pour-stage {
+  position: absolute;
+  pointer-events: none;
+  overflow: visible;
+}
+.ingredient-pour {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+.pour-source {
+  transform-origin: 370px 205px;
+  animation: source-arrive 220ms cubic-bezier(0.2, 0.75, 0.2, 1) both;
+}
+.falling-liquid {
+  animation: liquid-arrive 140ms 100ms ease-out both;
+  transform-origin: 370px 205px;
+}
+.stream-shadow {
+  fill: none;
+  stroke: #2a1a09;
+  stroke-width: 13;
+  opacity: 0.1;
+  filter: blur(3px);
+  transform: translate(8px, 5px);
+}
+.stream-highlight {
+  fill: none;
+  stroke-width: 1.5;
+  opacity: 0.35;
+  stroke-linecap: round;
+  stroke-dasharray: 52 87;
+  animation: stream-travel 700ms linear infinite;
+}
+.pour-condensed .stream-highlight {
+  animation-duration: 1100ms;
+  stroke-width: 2.5;
+}
+.pour-water .stream-body {
+  opacity: 0.46;
+}
+.pour-water .stream-highlight {
+  opacity: 0.65;
+}
+.pour-source.sugar-spoon {
+  transform-origin: 369px 230px;
+}
+.sugar-grain {
+  opacity: 0;
+  animation: grain-fall 460ms var(--grain-delay) linear infinite;
+}
+.is-leaving .pour-source {
+  animation: source-leave 360ms ease-in both;
+}
+.is-leaving .falling-liquid {
+  animation: liquid-leave 190ms ease-in both;
+}
+.is-leaving .falling-sugar {
+  opacity: 0;
+  transition: opacity 100ms;
+}
+@keyframes source-arrive {
+  from {
+    opacity: 0;
+    transform: translate(-32px, -30px) rotate(-12deg);
+  }
+  to {
+    opacity: 1;
+    transform: translate(0, 0) rotate(0deg);
+  }
+}
+@keyframes source-leave {
+  from {
+    opacity: 1;
+    transform: translate(0, 0) rotate(0deg);
+  }
+  to {
+    opacity: 0;
+    transform: translate(-24px, -42px) rotate(-20deg);
+  }
+}
+@keyframes liquid-arrive {
+  from {
+    opacity: 0;
+    transform: scaleY(0.12);
+  }
+  to {
+    opacity: 1;
+    transform: scaleY(1);
+  }
+}
+@keyframes liquid-leave {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+@keyframes stream-travel {
+  to {
+    stroke-dashoffset: -139;
+  }
+}
+@keyframes grain-fall {
+  0% {
+    opacity: 0;
+    transform: translate(var(--grain-x), 230px) rotate(var(--grain-turn));
+  }
+  9% {
+    opacity: 1;
+  }
+  68% {
+    opacity: 0.95;
+  }
+  86% {
+    opacity: 0.4;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(calc(var(--grain-x) + var(--grain-drift)), 450px)
+      rotate(calc(var(--grain-turn) + 180deg));
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ingredient-pour {
+    display: none;
+  }
+}
+
+.cup-overflow {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+.spill-run,
+.spill-shadow,
+.spill-glint {
+  fill: none;
+  stroke-linecap: round;
+}
+.spill-run {
+  stroke-width: 14;
+  stroke-dasharray: 1;
+  animation:
+    heavy-run 1500ms cubic-bezier(0.45, 0, 0.32, 1) both,
+    run-settle 2200ms 1500ms ease-out forwards;
+}
+.spill-shadow {
+  stroke: #301b0e;
+  stroke-width: 15;
+  opacity: 0;
+  filter: blur(1.4px);
+  animation: spill-shadow-in 1100ms 300ms ease-in forwards;
+}
+.spill-glint {
+  stroke: #fff9e9;
+  stroke-width: 0.8;
+  opacity: 0.22;
+  stroke-dasharray: 1;
+  animation:
+    heavy-run 1700ms 120ms cubic-bezier(0.45, 0, 0.32, 1) both,
+    glint-settle 2000ms 1800ms ease-out forwards;
+}
+.spill-pool {
+  animation: pool-spread 2100ms 650ms cubic-bezier(0.16, 0.65, 0.3, 1) both;
+}
+.spill-lip {
+  animation: lip-roll 1800ms ease-in-out both;
+}
+@keyframes heavy-run {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes pool-spread {
+  from {
+    opacity: 0;
+    transform: scale(0.08, 0.14);
+  }
+  18% {
+    opacity: 1;
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@keyframes lip-roll {
+  0% {
+    opacity: 0;
+    transform: translateX(-5px);
+  }
+  25% {
+    opacity: 0.85;
+  }
+  65% {
+    opacity: 0.65;
+  }
+  100% {
+    opacity: 0.2;
+    transform: translateX(0);
+  }
+}
+@keyframes run-settle {
+  to {
+    stroke-width: 9;
+    opacity: 0.75;
+  }
+}
+@keyframes glint-settle {
+  to {
+    opacity: 0.12;
+  }
+}
+@keyframes spill-shadow-in {
+  to {
+    opacity: 0.14;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .spill-run,
+  .spill-shadow,
+  .spill-glint {
+    display: none;
+  }
+  .spill-pool {
+    animation: none;
+  }
+}
+
+@media (min-width: 761px) and (max-width: 1200px) {
+  .experience:not(.cup-focus) .photograph {
+    --scene-size: min(76vw, 110svh);
   }
 }

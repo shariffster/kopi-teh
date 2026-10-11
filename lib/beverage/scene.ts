@@ -5,14 +5,18 @@ import { BeverageSimulation } from './simulation';
 import { BeverageInput, type InputSample } from './input';
 import { BeverageCompositor } from './compositor';
 import { Aftermath } from './aftermath';
+import { OverflowBudget, type OverflowEvent } from './overflow';
+export type { OverflowEvent } from './overflow';
 import {
   addMaterial,
+  removeLiquid,
   initialMaterial,
   materialColor,
   liquidVolume,
   pourPoint,
   pourDuration,
   INGREDIENT_COLORS,
+  POUR_PROFILES,
   type DrinkBase,
   type PourIngredient,
   type MaterialAmounts,
@@ -24,6 +28,9 @@ type Pour = {
   x: number;
   y: number;
   elapsed: number;
+  age: number;
+  arrival: number;
+  seed?: number[];
   duration: number;
   from: number[];
   to: number[];
@@ -36,6 +43,7 @@ export interface SceneCallbacks {
   onMetrics?: (message: string) => void;
   onReset?: (base: DrinkBase) => void;
   onResetRequest?: () => void;
+  onOverflow?: (event: OverflowEvent) => void;
 }
 export class LatteScene {
   private gpu: GPU | null = null;
@@ -60,6 +68,8 @@ export class LatteScene {
   private base: DrinkBase = 'coffee';
   private material = initialMaterial('coffee');
   private pours: Pour[] = [];
+  private overflow = new OverflowBudget();
+  private overflowId = 0;
   private originalStyle = true;
   private displayVolume = 140;
   private visualFill = 1;
@@ -214,6 +224,7 @@ export class LatteScene {
       return false;
     this.cancelTransition();
     this.input?.cancel();
+    this.overflow.reset();
     this.base = base;
     this.material = initialMaterial(base);
     this.pours = [];
@@ -245,6 +256,7 @@ export class LatteScene {
       return false;
     this.cancelTransition();
     this.input?.cancel();
+    this.overflow.reset();
     this.material = { ...recipe };
     this.base = recipe.tea > recipe.coffee ? 'tea' : 'coffee';
     this.pours = [];
@@ -369,11 +381,6 @@ export class LatteScene {
     const next = addMaterial(this.material, kind, amount);
     if (!next) return false;
     const firstLiquid = !liquidVolume(this.material) && kind !== 'sugar';
-    if (firstLiquid) {
-      // The ceramic is the vessel, never a pale pigment to mix into the drink.
-      // Filling the first liquid establishes its full base before local plumes.
-      this.sim.reset(materialColor(next));
-    }
     const [px, py] = pourPoint(x, y);
     const tail = this.pours.at(-1);
     if (tail?.kind === kind) {
@@ -385,10 +392,11 @@ export class LatteScene {
       );
       tail.duration = Math.max(
         tail.duration - tail.elapsed,
-        pourDuration(amount),
+        pourDuration(amount, kind),
       );
       tail.elapsed = 0;
-      tail.amount += amount;
+      // A longer hold extends one flow; it must not widen into a cumulative blob.
+      tail.amount = Math.max(tail.amount, amount);
       tail.to = materialColor(next);
       tail.x = px;
       tail.y = py;
@@ -399,7 +407,10 @@ export class LatteScene {
         x: px,
         y: py,
         elapsed: 0,
-        duration: pourDuration(amount),
+        age: 0,
+        arrival: 0.12,
+        seed: firstLiquid ? materialColor(next) : undefined,
+        duration: pourDuration(amount, kind),
         from: materialColor(firstLiquid ? next : this.material),
         to: materialColor(next),
       });
@@ -438,6 +449,7 @@ export class LatteScene {
         amounts: { ...this.material },
         volume: liquidVolume(this.material),
         pouring: this.pours.length > 0,
+        activePour: this.pours[0]?.kind ?? null,
         displayVolume: this.displayVolume,
         transitioning: this.transition !== null || this.originalRise !== null,
         originalSurface: this.originalStyle,
@@ -514,7 +526,11 @@ export class LatteScene {
       volumeChanged = true;
       if (progress >= 1) this.originalRise = null;
     } else {
-      const targetVolume = liquidVolume(this.material);
+      const arriving =
+        this.pours[0] && this.pours[0].age < this.pours[0].arrival;
+      const targetVolume = arriving
+        ? this.displayVolume
+        : liquidVolume(this.material);
       if (Math.abs(this.displayVolume - targetVolume) > 0.03) {
         const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
         this.displayVolume +=
@@ -536,10 +552,47 @@ export class LatteScene {
       const splats = this.input?.consume(dt) ?? [];
       // An empty ceramic well cannot be stirred or dented like a liquid.
       if (!liquidVolume(this.material) || this.transition) splats.length = 0;
+      // Read only native input here, before material-pour impulses are appended.
+      const spillAngle = this.overflow.advance(
+        now,
+        dt,
+        this.visualFill,
+        splats,
+        !!this.callbacks.onOverflow &&
+          !this.transition &&
+          !this.originalRise &&
+          this.pours.length === 0 &&
+          liquidVolume(this.material) >= 3,
+      );
+      if (spillAngle !== null) {
+        const remaining = removeLiquid(this.material, 3);
+        if (remaining) {
+          const color = materialColor(this.material);
+          this.material = remaining;
+          this.callbacks.onOverflow?.({
+            id: ++this.overflowId,
+            angle: spillAngle,
+            amountMl: 3,
+            recipe: { ...remaining },
+            color,
+          });
+        }
+      }
       const pour = this.pours[0];
       if (pour) {
+        pour.age += dt;
+      }
+      if (pour && pour.age >= pour.arrival) {
+        if (pour.seed) {
+          this.sim.reset(pour.seed);
+          pour.seed = undefined;
+        }
         pour.elapsed = Math.min(pour.duration, pour.elapsed + dt);
         const progress = pour.elapsed / pour.duration;
+        const profile = POUR_PROFILES[pour.kind];
+        const entry = Math.min(1, (pour.age - pour.arrival) / 0.13);
+        const exit = Math.min(1, (pour.duration - pour.elapsed) / 0.16);
+        const envelope = Math.max(0, entry * entry * (3 - 2 * entry) * exit);
         const target = pour.from.map(
           (value, i) => value + (pour.to[i] - value) * progress,
         );
@@ -548,35 +601,47 @@ export class LatteScene {
         if (!this.originalStyle && pour.kind !== 'sugar')
           this.sim.setMaterialReference(target);
         const radius =
-          pour.kind === 'sugar'
-            ? 0.035
-            : 0.055 + Math.min(0.08, Math.sqrt(pour.amount / 160) * 0.065);
-        this.sim.pour(
-          // Water carries no cream-coloured pigment into an existing beverage.
-          pour.kind === 'water' ? pour.from : INGREDIENT_COLORS[pour.kind],
-          pour.x,
-          pour.y,
-          radius,
-          Math.min(0.7, dt * 16),
-          progress * 5,
-          pour.kind === 'sugar' || pour.kind === 'water',
-          this.originalStyle,
-        );
+          profile.radius +
+          Math.min(0.016, Math.sqrt(pour.amount / 160) * 0.012);
+        if (pour.kind !== 'sugar')
+          this.sim.pour(
+            // Water carries no cream-coloured pigment into an existing beverage.
+            pour.kind === 'water' ? pour.from : INGREDIENT_COLORS[pour.kind],
+            pour.x,
+            pour.y,
+            radius,
+            Math.min(0.22, dt * profile.pigment * envelope),
+            pour.age * 1.6,
+            pour.kind === 'water',
+            this.originalStyle,
+            profile.viscosity,
+          );
         const impulse: Splat = {
           x: pour.x,
           y: pour.y,
-          radius: radius * 2.2,
-          dx: dt * (0.2 + Math.sin(progress * 8) * 0.09),
-          dy: dt * (-0.12 + Math.cos(progress * 5) * 0.06),
-          spin: dt * (pour.kind === 'condensed' ? 0.07 : 0.11),
-          prod: dt * 0.1,
+          radius: radius * 2.4,
+          dx:
+            dt *
+            profile.force *
+            envelope *
+            (0.8 + Math.sin(pour.age * 2.8) * 0.1),
+          dy: -dt * profile.force * envelope * 0.46,
+          spin: dt * profile.spin * envelope,
+          prod: pour.kind === 'sugar' ? 0 : dt * 0.004 * envelope,
         };
         if (liquidVolume(this.material)) {
           splats.push(impulse);
+          if (Math.floor(pour.age * 3) !== Math.floor((pour.age - dt) * 3))
+            this.compositor.addRipple(
+              pour.x,
+              pour.y,
+              profile.ripple * envelope,
+            );
           if (
-            Math.floor(pour.elapsed * 8) !== Math.floor((pour.elapsed - dt) * 8)
+            pour.kind === 'sugar' &&
+            Math.floor(pour.age * 10) !== Math.floor((pour.age - dt) * 10)
           )
-            this.compositor.addRipple(pour.x, pour.y, 0.35);
+            this.compositor.addSugarGrains(pour.x, pour.y);
         }
         if (progress >= 1) this.pours.shift();
       }

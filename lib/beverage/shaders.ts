@@ -29,21 +29,26 @@ export const POUR = `
 uniform sampler2D source;
 uniform vec3 ingredientColor;
 uniform vec2 centre;
-uniform float radius, strength, phase, sugar;
+uniform float radius, strength, phase, sugar, viscosity;
 void main() {
   vec4 current=texture(source,uv);
   vec2 d=uv-centre;
   float theta=atan(d.y,d.x);
-  float shape=1.0+.23*sin(theta*5.0+phase*.65)+.13*sin(theta*11.0-phase*.7)+.06*sin(theta*23.0+phase);
-  float distance=length(d)*shape;
+  // Milk lays down a narrow soft fold. It is carried by the fluid, rather
+  // than painted as an expanding, many-pointed splash at the nozzle.
+  vec2 fold=d;
+  fold.x+=sin(d.y/max(radius,.001)*3.2+phase*.45)*radius*.18*viscosity;
+  fold*=mix(vec2(1.0),vec2(.88,1.18),viscosity);
+  float shape=1.0+.06*sin(theta*3.0+phase*.40);
+  float distance=length(fold)*shape;
   float plume=exp(-distance*distance/(radius*radius*.52));
   // Fine branching tongues enter the pigment field and travel with the flow;
   // these are actual transported additions, not a stationary surface overlay.
-  float fingers=pow(.5+.5*sin(theta*9.0+sin(theta*4.0)*1.8-distance/radius*7.0+phase*.8),10.0);
+  float fingers=pow(.5+.5*sin(theta*3.0-distance/radius*3.0+phase*.30),4.0);
   float skirtDistance=(distance-radius*.90)/(radius*.50);
   float skirt=exp(-skirtDistance*skirtDistance)*fingers;
   float mask=1.0-smoothstep(.44,.48,length(uv-.5));
-  float amount=clamp((plume+.68*skirt)*strength*mask,0.0,.94);
+  float amount=clamp((plume+.16*skirt)*strength*mask,0.0,.30);
   // Sugar and water disturb the surface without adding a white pigment layer.
   vec3 colour=mix(current.rgb,ingredientColor,amount*(1.0-sugar));
   fragColor=vec4(colour,max(current.a,amount*.65));
@@ -81,10 +86,11 @@ void main() {
     mark=max(mark,exp(-dot(stem,stem)*1.5)*.72);
   }
   mark*=1.0-smoothstep(.40,.46,length(uv-.5));
-  if(foamMode>.5) fragColor=vec4(mix(current.r,.93,mark),current.g,0,1);
+  if(foamMode>.5) fragColor=vec4(mix(current.r,.93,mark),current.g,current.ba);
   else fragColor=vec4(mix(current.rgb,vec3(.98,.91,.77),mark),max(current.a,mark*.2));
 }`;
-// R: persistent foam coverage; G: signed, relaxing surface displacement.
+// R: foam coverage; G: relaxing displacement; B: surviving photographic
+// microbubbles; A: persistent local disturbance. No bubbles are generated.
 // This is an artistic thin-layer model, not measured foam chemistry.
 export const FOAM_SEED = `
 uniform sampler2D photograph;
@@ -92,7 +98,7 @@ uniform vec4 crop;
 void main() {
   vec3 c=texture(photograph,crop.xy+uv*crop.zw).rgb;
   float milk=smoothstep(.22,.70,c.b)*smoothstep(.52,.85,c.g);
-  fragColor=vec4(.06+.90*milk,0,0,1);
+  fragColor=vec4(.06+.90*milk,0,1,0);
 }`;
 export const FOAM_MEAN = `
 uniform sampler2D source;
@@ -126,11 +132,18 @@ void main() {
   vec2 v=texture(velocity,uv).xy;
   vec2 back=bound(uv-adt*texture(velocity,bound(uv-.5*adt*v)).xy);
   vec2 ahead=bound(uv+adt*texture(velocity,bound(uv+.5*adt*v)).xy);
-  vec2 corrected=texture(forward,uv).rg+.5*(texture(source,uv).rg-texture(forward,ahead).rg);
+  vec4 corrected=texture(forward,uv)+.5*(texture(source,uv)-texture(forward,ahead));
   vec2 grid=(floor(back/texel-.5)+.5)*texel;
-  vec2 a=texture(source,bound(grid)).rg, b=texture(source,bound(grid+vec2(texel.x,0))).rg;
-  vec2 c=texture(source,bound(grid+vec2(0,texel.y))).rg, d=texture(source,bound(grid+texel)).rg;
-  vec2 f=clamp(corrected,min(min(a,b),min(c,d)),max(max(a,b),max(c,d)));
+  vec4 a=texture(source,bound(grid)), b=texture(source,bound(grid+vec2(texel.x,0)));
+  vec4 c=texture(source,bound(grid+vec2(0,texel.y))), d=texture(source,bound(grid+texel));
+  vec4 f=clamp(corrected,min(min(a,b),min(c,d)),max(max(a,b),max(c,d)));
+  float rim=smoothstep(.37,.425,length(uv-.5));
+  float attached=smoothstep(.452,.485,length(uv-.5));
+  // A wall-bound fraction survives while free bubbles are sheared and dissolve.
+  float mobility=mix(1.0,.12,attached);
+  float shear=max(0.0,length(v)-.0015);
+  f.a=clamp(f.a+shear*dt*8.0*rim,0.0,1.0);
+  f.b*=exp(-shear*dt*2.8*mobility);
   float mask=1.0-smoothstep(.445,.481,length(uv-.5));
   // Balance sharpening around the current weighted coverage, not a fixed .5
   // threshold that would gradually erase a minority of foam. Correct numerical
@@ -151,6 +164,9 @@ void main() {
     float strength=min(length(impulses[i].xy)*1.1+abs(impulses[i].z)*.4+abs(impulses[i].w)*1.8,.11);
     f.g+=stamp*strength*mask;
     f.r+=stamp*strength*.65*mask;
+    float local=exp(-dot(delta,delta)/max(radius*radius*1.6,.00001))*rim;
+    f.a=clamp(f.a+local*strength*5.0,0.0,1.0);
+    f.b*=exp(-local*strength*4.5*mobility);
   }
   // The live contact imposes a bounded shape instead of continuously digging
   // deeper. After release, advection, smoothing and relaxation fill its groove.
@@ -162,8 +178,11 @@ void main() {
     float target=impression(delta,radius,contactDirections[i].xy)*contactPositions[i].w;
     float follow=(1.0-exp(-contactFollow*dt))*exp(-q*.35)*mask;
     f.g=mix(f.g,target,follow);
+    float touch=exp(-q*.65)*rim;
+    f.a=clamp(f.a+touch*dt*5.0,0.0,1.0);
+    f.b*=exp(-touch*dt*1.8*mobility);
   }
-  fragColor=vec4(clamp(f.r,0.0,1.0),clamp(f.g,-.26,.20),0,1);
+  fragColor=vec4(clamp(f.r,0.0,1.0),clamp(f.g,-.26,.20),clamp(f.ba,0.0,1.0));
 }`;
 export const MEAN = `
 uniform sampler2D source;
@@ -298,6 +317,7 @@ export const COMPOSITE = `
 uniform sampler2D pigment, velocity, pristine, currentMean, foamSurface;
 uniform vec4 crop;
 uniform vec4 ripples[12];
+uniform vec4 sugarGrains[16];
 uniform float rippleSpeed, rippleDamping, edgeGuard, pristineMix, materialRelief, mixedContrast;
 uniform vec2 pixel;
 uniform vec2 foamPixel;
@@ -324,6 +344,12 @@ void main() {
   }
   float radius=length(uv-.5);
   float interior=1.0-smoothstep(.5-edgeGuard-.006,.5-edgeGuard,radius);
+  vec4 foamState=texture(foamSurface,bound(uv));
+  float rimBand=smoothstep(.37,.425,radius)*(1.0-smoothstep(.484,.490,radius));
+  float workedRim=foamState.a*rimBand*originalStyle;
+  // The untouched photographic boundary remains exact; only a contacted rim
+  // reveals its transported texture instead of staying painted on the vessel.
+  interior=max(interior,workedRim);
   vec2 offset=normal*.12*interior;
   vec4 surface=texture(pigment,bound(uv+offset));
   vec3 color=surface.rgb;
@@ -356,6 +382,15 @@ void main() {
   vec3 cream=vec3(.96,.895,.755)+(islands-.5)*.025;
   vec3 material=mix(color*vec3(.94,.92,.89),cream,cover);
   color=mix(color,material,mixed*foamPresence);
+  // Dissolving microbubbles lose their fine photographic contrast. The broad
+  // colour and remaining wall-bound bubbles survive; no synthetic fizz appears.
+  vec2 bubbleStep=vec2(.0055,0);
+  vec3 softened=(texture(pigment,bound(uv+offset+bubbleStep)).rgb+
+    texture(pigment,bound(uv+offset-bubbleStep)).rgb+
+    texture(pigment,bound(uv+offset+bubbleStep.yx)).rgb+
+    texture(pigment,bound(uv+offset-bubbleStep.yx)).rgb+surface.rgb*2.0)/6.0;
+  float breakup=workedRim*(1.0-foamState.b);
+  color=mix(color,softened,breakup*.92);
   // Local depth cues follow signed displacement, not every foam filament.
   // A depressed patch reveals warmer coffee; the displaced bank catches milk.
   // Both disappear as the groove fills, without recovering the original art.
@@ -391,6 +426,17 @@ void main() {
   color=mix(color,vec3(.98,.94,.83),gloss*(1.0-originalStyle));
   vec3 original=texture(pristine,crop.xy+uv*crop.zw).rgb;
   color=mix(color,original,pristineMix*originalStyle);
+  // Temporary crystals catch light, then dissolve. They never enter the milk
+  // pigment or foam fields, so sugar cannot leave a white bloom behind.
+  for(int i=0;i<16;i++) {
+    vec4 grain=sugarGrains[i];
+    if(grain.w<=0.0) continue;
+    float dissolve=(1.0-smoothstep(.18,.64,grain.z))*smoothstep(0.0,.05,grain.z);
+    vec2 delta=uv-grain.xy;
+    delta.x+=grain.z*.004;
+    float crystal=1.0-smoothstep(grain.w*.65,grain.w,length(delta));
+    color=mix(color,vec3(.99,.975,.90),crystal*dissolve*.90);
+  }
   float ceramicEdge=smoothstep(.493,.506,radius);
   vec3 meniscus=color*(1.0-.20*smoothstep(.435,.493,radius));
   vec3 fullSurface=mix(mix(meniscus,original,ceramicEdge),mix(original,color,interior),originalStyle);
@@ -399,16 +445,37 @@ void main() {
   float fill=clamp(displayFill,0.0,1.0);
   vec2 poolCentre=vec2(.5,.5-.042*(1.0-fill));
   float poolRadius=.10+.40*pow(fill,.55);
-  float poolDistance=length((uv-poolCentre)*vec2(1.0,1.0+.10*(1.0-fill)));
-  float edge=1.0-smoothstep(poolRadius-.005,poolRadius+.005,poolDistance);
+  vec2 poolDelta=(uv-poolCentre)*vec2(1.0,1.0+.10*(1.0-fill));
+  float poolDistance=length(poolDelta);
+  float shallow=(1.0-originalStyle)*(1.0-smoothstep(.08,.60,fill));
+  float contactAngle=atan(poolDelta.y,poolDelta.x);
+  // Subpixel capillary irregularity, fixed to the floor rather than wobbling.
+  // The volume-driven centre and radius remain unchanged.
+  float contactOffset=(sin(contactAngle*3.0+.7)*.0012+
+    sin(contactAngle*7.0-1.1)*.0006)*shallow;
+  float contactDistance=poolDistance-poolRadius+contactOffset;
+  float edge=1.0-smoothstep(-.004,.004,contactDistance);
   edge*=smoothstep(0.0,.012,fill);
   float wall=smoothstep(.24,.50,radius);
   float bowlShade=.96-.13*wall+.028*(uv.y-.5);
   vec3 ceramic=vec3(.895,.856,.773)*bowlShade;
-  float wallShadow=exp(-pow((poolDistance-poolRadius-.007)/.018,2.0))*(1.0-fill)*.10*smoothstep(0.0,.012,fill);
+  // A shallow pool contacts the ceramic. A narrow contact shadow avoids the
+  // broad drop shadow that would make it read as a raised brown disc.
+  float shadowWidth=mix(.018,.007,shallow);
+  float wallShadow=exp(-pow((contactDistance-.003)/shadowWidth,2.0))*(1.0-fill)*mix(.10,.045,shallow)*smoothstep(0.0,.012,fill);
   ceramic*=1.0-wallShadow;
-  float lip=exp(-pow((poolDistance-poolRadius+.004)/.006,2.0));
-  vec3 pool=fullSurface*(1.0-lip*.13*(1.0-fill));
+  float lip=exp(-pow((contactDistance+.0035)/.0045,2.0));
+  vec3 pool=fullSurface*(1.0-lip*.11*(1.0-fill));
+  vec2 poolUV=poolDelta/max(poolRadius,.001);
+  // The reflected softbox scales with the exposed liquid. The previous
+  // full-cup reflection lay outside a 5 ml pool and left it completely matte.
+  vec2 localReflection=poolUV+normal*.6+slope*.025-vec2(-.20,.32);
+  float poolWindow=exp(-pow(abs((localReflection.x+localReflection.y*.45)/.47),4.0)-pow(abs(localReflection.y/.085),2.0));
+  float poolHalo=exp(-dot(localReflection*vec2(1.7,3.0),localReflection*vec2(1.7,3.0)))*.032;
+  float contactLight=max(0.0,dot(poolDelta/max(poolDistance,.001),normalize(vec2(-.5,.8))));
+  float wetEdge=exp(-pow((contactDistance+.0015)/.0026,2.0))*contactLight*.12;
+  pool*=1.0-shallow*.045*(1.0-smoothstep(.0,1.0,length(poolUV)));
+  pool=mix(pool,vec3(.96,.91,.79),shallow*(poolWindow*.16+poolHalo+wetEdge));
   vec3 recessed=mix(ceramic,pool,edge);
   recessed=mix(recessed,original,ceramicEdge);
   // At the photographic brim, the original Befrothed path is exact.

@@ -7,7 +7,7 @@ import {
   useState,
   type RefObject,
 } from 'react';
-import { LatteScene } from '@/lib/beverage/scene';
+import { type OverflowEvent, LatteScene } from '@/lib/beverage/scene';
 import {
   addIngredient,
   DRINK_PRESETS,
@@ -44,6 +44,7 @@ export function useDrink(
     'original',
   );
   const [served, setServed] = useState(false);
+  const [spills, setSpills] = useState<OverflowEvent[]>([]);
   const [pouring, setPouring] = useState<IngredientKind | null>(null);
   const [preparing, setPreparing] = useState(false);
   const [draining, setDraining] = useState(false);
@@ -78,6 +79,8 @@ export function useDrink(
     if (pourReleaseTimer.current !== null)
       clearInterval(pourReleaseTimer.current);
     const finish = () => {
+      const active = scene.current?.diagnostics().drink.activePour;
+      if (active && !preparingRef.current) setPouring(active);
       if (
         !readyRef.current ||
         !scene.current ||
@@ -179,7 +182,7 @@ export function useDrink(
       remember();
       publishRecipe(next);
       publishPreset(null);
-      setPouring(kind);
+      setPouring(scene.current.diagnostics().drink.activePour ?? kind);
       releaseStream();
       return true;
     },
@@ -191,10 +194,16 @@ export function useDrink(
       stopPour();
       const amount = kind === 'sugar' ? 2 : 5;
       if (!add(kind, amount)) return;
-      setPouring(kind);
-      holdTimer.current = setInterval(() => {
-        if (!add(kind, amount)) stopPour();
-      }, 250);
+      holdTimer.current = setInterval(
+        () => {
+          if (!add(kind, amount)) stopPour();
+        },
+        kind === 'condensed'
+          ? 820
+          : kind === 'evaporated' || kind === 'sugar'
+            ? 650
+            : 450,
+      );
     },
     [add, stopPour],
   );
@@ -205,6 +214,7 @@ export function useDrink(
       if (!readyRef.current || !engine) return false;
       stopPour();
       cancelPreparation();
+      setSpills([]);
       unserve();
       engine.setFrothDrawing(false);
       setDrawingFroth(false);
@@ -333,6 +343,7 @@ export function useDrink(
     readyRef.current = false;
     setReady(false);
     setError('');
+    setSpills([]);
     setGeneration((value) => value + 1);
   }, [cancelPreparation, stopPour]);
 
@@ -345,6 +356,13 @@ export function useDrink(
     setReady(false);
     const engine = new LatteScene(canvasRef.current, photoRef.current, {
       onInteract: () => {},
+      onOverflow: (spill) => {
+        if (disposed) return;
+        remember();
+        publishRecipe({ ...spill.recipe });
+        publishPreset(null);
+        setSpills((previous) => [...previous, spill].slice(-2));
+      },
       onError: (message) => {
         if (disposed) return;
         setDrawingFroth(false);
@@ -500,6 +518,7 @@ export function useDrink(
     selectedPreset,
     served,
     pouring,
+    spills,
     preparing,
     draining,
     drawingFroth,

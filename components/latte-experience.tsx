@@ -1,7 +1,7 @@
 'use client';
 /* The photograph and WebGL crop share exact pixel registration. */
 /* eslint-disable next/no-img-element, jsx-a11y/no-interactive-element-to-noninteractive-role */
-import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ArrowRight,
   RotateCcw,
@@ -13,6 +13,8 @@ import {
   Paintbrush,
 } from 'lucide-react';
 import { useDrink } from './use-drink';
+import { IngredientPour } from './ingredient-pour';
+import { CupOverflow } from './cup-overflow';
 import {
   DRINK_PRESETS,
   EMPTY_RECIPE,
@@ -162,15 +164,18 @@ export function LatteExperience() {
                     : 'Drink surface. Drag in circles to stir. Arrow keys stir; space makes a ripple; R empties the cup.'
                 }
               />
-              {activeIngredient && (
-                <div
-                  className={`pour-stream stream-${activeIngredient.id}`}
-                  style={
-                    { '--pour-color': activeIngredient.color } as CSSProperties
-                  }
-                  aria-hidden="true"
-                />
-              )}
+            </div>
+            <div
+              className="pour-stage"
+              style={{
+                left: `${(latteAsset.liquid.center[0] - latteAsset.liquid.radius[0]) * 100}%`,
+                top: `${(latteAsset.liquid.center[1] - latteAsset.liquid.radius[1]) * 100}%`,
+                width: `${latteAsset.liquid.radius[0] * 200}%`,
+                height: `${latteAsset.liquid.radius[1] * 200}%`,
+              }}
+            >
+              <CupOverflow spills={drink.spills} />
+              <IngredientPour kind={drink.pouring} />
             </div>
           </div>
           {!drink.served && (

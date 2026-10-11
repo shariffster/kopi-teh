@@ -51,6 +51,7 @@ export function registerProbe(
               'gentle',
               'fast',
               'stir',
+              'rim_stir',
               'hold',
               'tap',
               'degrade',
@@ -81,6 +82,7 @@ export function registerProbe(
             'gentle',
             'fast',
             'stir',
+            'rim_stir',
             'hold',
             'tap',
             'degrade',
@@ -146,13 +148,26 @@ export function registerProbe(
             await pause(p.gesture === 'hold' ? 2800 : 65);
             fire('pointerup', 0.51, 0.46);
           } else {
-            const stir = p.gesture === 'stir',
-              steps = stir ? 100 : p.gesture === 'gentle' ? 90 : 12;
+            const rimStir = p.gesture === 'rim_stir';
+            const stir = p.gesture === 'stir' || rimStir,
+              steps = rimStir
+                ? 120
+                : stir
+                  ? 100
+                  : p.gesture === 'gentle'
+                    ? 90
+                    : 12;
             const point = (i: number) =>
               stir
                 ? {
-                    x: 0.5 + Math.cos((i / steps) * Math.PI * 4) * 0.22,
-                    y: 0.5 + Math.sin((i / steps) * Math.PI * 4) * 0.22,
+                    x:
+                      0.5 +
+                      Math.cos((i / steps) * Math.PI * (rimStir ? 6 : 4)) *
+                        (rimStir ? 0.445 : 0.22),
+                    y:
+                      0.5 +
+                      Math.sin((i / steps) * Math.PI * (rimStir ? 6 : 4)) *
+                        (rimStir ? 0.445 : 0.22),
                   }
                 : { x: 0.34 + (i / steps) * 0.3, y: 0.43 + (i / steps) * 0.1 };
             let v = point(0);

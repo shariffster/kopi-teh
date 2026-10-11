@@ -89,9 +89,79 @@ export function addMaterial(
     return null;
   return { ...amounts, [kind]: amounts[kind] + amount };
 }
-/** A 5 ml held-button dose completes before the next 250 ms repeat. */
-export function pourDuration(amount: number): number {
-  return Math.min(0.85, 0.18 + amount / 230);
+export const POUR_PROFILES = {
+  coffee: {
+    base: 0.38,
+    rate: 500,
+    max: 0.85,
+    radius: 0.035,
+    pigment: 6.5,
+    force: 0.055,
+    spin: 0.012,
+    ripple: 0.12,
+    viscosity: 0,
+  },
+  tea: {
+    base: 0.4,
+    rate: 500,
+    max: 0.9,
+    radius: 0.036,
+    pigment: 6.0,
+    force: 0.05,
+    spin: 0.011,
+    ripple: 0.11,
+    viscosity: 0,
+  },
+  water: {
+    base: 0.38,
+    rate: 650,
+    max: 0.78,
+    radius: 0.03,
+    pigment: 0,
+    force: 0.055,
+    spin: 0.01,
+    ripple: 0.13,
+    viscosity: 0,
+  },
+  condensed: {
+    base: 0.75,
+    rate: 150,
+    max: 1.6,
+    radius: 0.034,
+    pigment: 2.7,
+    force: 0.032,
+    spin: 0.006,
+    ripple: 0.07,
+    viscosity: 1,
+  },
+  evaporated: {
+    base: 0.6,
+    rate: 240,
+    max: 1.15,
+    radius: 0.039,
+    pigment: 3.8,
+    force: 0.043,
+    spin: 0.009,
+    ripple: 0.09,
+    viscosity: 0.65,
+  },
+  sugar: {
+    base: 0.44,
+    rate: 110,
+    max: 0.8,
+    radius: 0.034,
+    pigment: 0,
+    force: 0.006,
+    spin: 0,
+    ripple: 0.025,
+    viscosity: 0,
+  },
+} as const;
+/** Optional kind keeps the old timing helper compatible for existing callers. */
+export function pourDuration(amount: number, kind?: PourIngredient): number {
+  if (!kind) return Math.min(0.85, 0.18 + amount / 230);
+  const profile = POUR_PROFILES[kind];
+  return Math.min(profile.max, profile.base + amount / profile.rate);
 }
 export function pourPoint(x = 0.42, y = 0.55): [number, number] {
   if (!Number.isFinite(x) || !Number.isFinite(y)) return [0.42, 0.55];
@@ -100,4 +170,40 @@ export function pourPoint(x = 0.42, y = 0.55): [number, number] {
     distance = Math.hypot(dx, dy);
   const scale = distance > 0.32 ? 0.32 / distance : 1;
   return [0.5 + dx * scale, 0.5 + dy * scale];
+}
+
+/** Largest-remainder allocation keeps the ledger integral and loses exact ml. */
+export function removeLiquid(
+  amounts: MaterialAmounts,
+  amount: number,
+): MaterialAmounts | null {
+  const keys = ['coffee', 'tea', 'condensed', 'evaporated', 'water'] as const;
+  const volume = liquidVolume(amounts);
+  if (
+    !Number.isInteger(amount) ||
+    amount <= 0 ||
+    amount > volume ||
+    keys.some((key) => !Number.isInteger(amounts[key]) || amounts[key] < 0)
+  )
+    return null;
+  const allocations = keys.map((key, index) => {
+    const exact = (amounts[key] * amount) / volume;
+    return { key, index, ml: Math.floor(exact), remainder: exact % 1 };
+  });
+  let rest = amount - allocations.reduce((sum, item) => sum + item.ml, 0);
+  const ranked = [...allocations].sort((a, b) =>
+    Math.abs(b.remainder - a.remainder) < 1e-10
+      ? a.index - b.index
+      : b.remainder - a.remainder,
+  );
+  for (const item of ranked) {
+    if (!rest) break;
+    if (item.ml < amounts[item.key]) {
+      item.ml++;
+      rest--;
+    }
+  }
+  const next = { ...amounts };
+  for (const item of allocations) next[item.key] -= item.ml;
+  return next;
 }
