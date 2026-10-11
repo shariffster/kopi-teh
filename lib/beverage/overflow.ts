@@ -8,16 +8,16 @@ export interface OverflowEvent {
   amountMl: number;
   recipe: MaterialAmounts;
   color: readonly number[];
+  highWaterFill: number;
+  fillBefore: number;
 }
 
-/** Only deliberate, sustained native stirring can earn a small spill. */
+/** Outward rim momentum spills more readily when there is less headroom. */
 export class OverflowBudget {
   private energy = 0;
-  private events = 0;
   private lastEvent = -Infinity;
   reset() {
     this.energy = 0;
-    this.events = 0;
     this.lastEvent = -Infinity;
   }
   advance(
@@ -29,9 +29,9 @@ export class OverflowBudget {
   ): number | null {
     if (
       !enabled ||
-      fill <= 0.9 ||
-      this.events >= 2 ||
-      now - this.lastEvent < 6
+      !Number.isFinite(fill) ||
+      fill < 0.7 ||
+      now - this.lastEvent < 0.7
     ) {
       this.energy = 0;
       return null;
@@ -40,21 +40,28 @@ export class OverflowBudget {
       x = 0,
       y = 0;
     for (const s of splats) {
-      const radius = Math.hypot(s.x - 0.5, s.y - 0.5);
+      const rx = s.x - 0.5,
+        ry = s.y - 0.5;
+      const radius = Math.hypot(rx, ry);
       if (radius < 0.35 || radius > 0.479) continue;
-      const movement = Math.hypot(s.dx, s.dy);
-      if (!Number.isFinite(movement)) continue;
-      force += movement;
-      x += (s.x - 0.5) * movement;
-      y += (s.y - 0.5) * movement;
+      const outward = (s.dx * rx + s.dy * ry) / radius;
+      if (!Number.isFinite(outward) || outward <= 0) continue;
+      const impulse = outward * Math.min(1, (radius - 0.35) / 0.07);
+      force += impulse;
+      x += rx * impulse;
+      y += ry * impulse;
     }
-    const rate = force / Math.max(dt, 1 / 240);
-    if (rate > 2.5)
-      this.energy += Math.min(dt, 0.05) * Math.min(2, (rate - 2.5) / 2);
-    else this.energy = Math.max(0, this.energy - dt * 1.2);
-    if (this.energy < 0.38 || force === 0) return null;
+    const headroom = Math.max(0, Math.min(1, (1 - fill) / 0.3));
+    const threshold = 0.8 + 4 * Math.pow(headroom, 1.3);
+    const needed = 0.025 + 0.14 * Math.pow(headroom, 1.6);
+    const step = Math.max(1 / 240, Math.min(dt, 0.05));
+    const rate = force / step;
+    this.energy =
+      rate > threshold
+        ? this.energy + (rate - threshold) * step
+        : Math.max(0, this.energy - step * 0.5);
+    if (this.energy < needed || force === 0) return null;
     this.energy = 0;
-    this.events++;
     this.lastEvent = now;
     return Math.atan2(-y, x);
   }

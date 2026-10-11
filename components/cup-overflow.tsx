@@ -9,6 +9,11 @@ const poolOutline =
 export function CupOverflow({ spills }: { spills: OverflowEvent[] }) {
   const uid = useId().replace(/:/g, '');
   if (!spills.length) return null;
+  const highWater = Math.max(
+    ...spills.map((spill) => spill.highWaterFill ?? 1),
+  );
+  const highRadius = 340 + 160 * Math.pow(highWater, 0.4);
+  const highCentreY = 500 + 25 * (1 - highWater);
   return (
     <svg
       className="cup-overflow"
@@ -16,6 +21,17 @@ export function CupOverflow({ spills }: { spills: OverflowEvent[] }) {
       preserveAspectRatio="none"
       aria-hidden="true"
     >
+      <ellipse
+        className="spill-high-water"
+        cx="500"
+        cy={highCentreY}
+        rx={highRadius - 3}
+        ry={(highRadius - 3) / (1 + 0.045 * (1 - highWater))}
+        fill="none"
+        stroke="#8d6747"
+        strokeWidth="2.4"
+        opacity=".065"
+      />
       {spills.map((spill) => {
         const id = `${uid}-${spill.id}`;
         const rgb = spill.color.map((c) =>
@@ -49,6 +65,15 @@ export function CupOverflow({ spills }: { spills: OverflowEvent[] }) {
                 <stop offset="1" stopColor={colour} stopOpacity=".4" />
               </radialGradient>
             </defs>
+            <path
+              className="spill-wall-residue"
+              d="M498 -17 C502 -8 508 -6 519 0 C532 7 540 8 548 11"
+              fill="none"
+              stroke={colour}
+              strokeWidth="8"
+              strokeLinecap="round"
+              opacity=".1"
+            />
             <g transform={`scale(1 ${width})`}>
               <path
                 className="spill-shadow"

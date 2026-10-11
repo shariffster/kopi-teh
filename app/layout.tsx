@@ -7,7 +7,7 @@ export const viewport: Viewport = {
   themeColor: '#ccbaa3',
 };
 export const metadata: Metadata = {
-  title: 'Kopi / Teh — Pour lab',
+  title: 'Kopi / Teh — Made your way',
   icons: { icon: '/favicon.svg' },
   description:
     'Pour, stir and serve. A tactile exploration of familiar kopi and teh, made your way.',

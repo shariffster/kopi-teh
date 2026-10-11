@@ -78,6 +78,9 @@ export class LatteScene {
   } | null = null;
   private overflow = new OverflowBudget();
   private overflowId = 0;
+  private spillHighWaterFill = 0;
+  private originalSpilledMl = 0;
+  private originalFullVolume = 180;
   private originalStyle = true;
   private displayVolume = 140;
   private visualFill = 1;
@@ -235,6 +238,8 @@ export class LatteScene {
     this.cancelTransition();
     this.input?.cancel();
     this.overflow.reset();
+    this.spillHighWaterFill = 0;
+    this.originalSpilledMl = 0;
     this.base = base;
     this.material = initialMaterial(base);
     this.pours = [];
@@ -267,7 +272,10 @@ export class LatteScene {
     this.cancelTransition();
     this.input?.cancel();
     this.overflow.reset();
+    this.spillHighWaterFill = 0;
+    this.originalSpilledMl = 0;
     this.material = { ...recipe };
+    this.originalFullVolume = liquidVolume(recipe);
     this.base = recipe.tea > recipe.coffee ? 'tea' : 'coffee';
     this.pours = [];
     this.compositor.reset();
@@ -614,7 +622,7 @@ export class LatteScene {
         volumeChanged = true;
       }
       this.visualFill = this.originalStyle
-        ? 1
+        ? Math.max(0, 1 - this.originalSpilledMl / this.originalFullVolume)
         : Math.min(1, this.displayVolume / 300);
     }
     if (!document.hidden) {
@@ -639,6 +647,7 @@ export class LatteScene {
           liquidVolume(this.material) >= 8,
       );
       if (spillAngle !== null) {
+        const fillBefore = this.visualFill;
         const remaining = removeLiquid(this.material, 8);
         if (remaining) {
           // Match the inherited golden surface when that presentation is active.
@@ -646,10 +655,17 @@ export class LatteScene {
             ? [0.59, 0.35, 0.13]
             : materialColor(this.material);
           this.material = remaining;
+          if (this.originalStyle) this.originalSpilledMl += 8;
+          this.spillHighWaterFill = Math.max(
+            this.spillHighWaterFill,
+            fillBefore,
+          );
           this.callbacks.onOverflow?.({
             id: ++this.overflowId,
             angle: spillAngle,
             amountMl: 8,
+            highWaterFill: this.spillHighWaterFill,
+            fillBefore,
             recipe: { ...remaining },
             color,
           });

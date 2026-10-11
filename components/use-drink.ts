@@ -363,7 +363,7 @@ export function useDrink(
         remember();
         publishRecipe({ ...spill.recipe });
         publishPreset(null);
-        setSpills((previous) => [...previous, spill].slice(-2));
+        setSpills((previous) => [...previous, spill].slice(-6));
       },
       onError: (message) => {
         if (disposed) return;

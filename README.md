@@ -2,7 +2,7 @@
 
 A tactile drink-making prototype: stir an original finished latte, deliberately start a new kopi or teh, change the proportions, shape the milk surface and serve your own cup. Built for the Common Ground Makeathon on 11 October 2026.
 
-**0.2.0 — 11 October 2026.** The latest opening, depth transitions and froth controls are implemented in source. Final integrated QA and release packaging remain in progress.
+**0.4.0 candidate — 11 October 2026.** Local refinements add broader liquid filling, high ingredient pours, a sugar cascade and progressively drawn photographic froth. Final integrated QA and release packaging remain in progress; this source version alone does not certify publication.
 
 ## Try the flow
 
@@ -52,10 +52,10 @@ This project forks **Befrothed saved version 5 / v0.2.2**, commit `51981b8219deb
 
 The fork retains Befrothed's registered photographic scene, WebGL surface, interaction engine and historical release notes. The default finished surface is restored from the exact saved-version-5 source identified above; it is not a newly generated replacement. The scene is generated photographic-style artwork, not a camera photograph; its original provenance is retained in [ASSET_NOTES.md](public/assets/beverages/latte/ASSET_NOTES.md). Existing provenance and dependency licence terms remain applicable; these docs introduce no new licence grant.
 
-An ingredient-props image experiment was rejected for edge artefacts and excluded from this release. Ingredient controls use colour swatches.
+Ingredient controls use colour swatches. Active pours use generated pitcher and spoon assets; these are visual props, not photographs of real utensils. Other rejected prop experiments remain unused.
 
 The interaction requires WebGL 2; graphics failure is surfaced with a reload control. Prior Befrothed device observations in `V0_*_NOTES.md` are historical evidence, not certification of this fork. See [CHANGELOG.md](CHANGELOG.md) for the new scope.
 
-## Verification status for 0.2.0
+## Verification status for 0.4.0 candidate
 
-Root browser checks have exercised a native pointer drag on the restored original surface and inspected the recessed new-cup depth treatment. These are scoped observations. Final integrated QA, froth-control coverage, release packaging and deployment are not established by this document; previous revision checks do not certify the changed implementation.
+The local liquid/froth/sugar candidate passed 44 tests, typecheck, scoped lint and a production build before the final directional overflow refinement. Browser checks exercised the original surface, held pours, full capacity, sugar cascade and froth controls. Final overflow browser QA and release packaging remain in progress. These are scoped desktop observations, not native-device or physical-simulation certification.
