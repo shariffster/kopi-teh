@@ -110,31 +110,51 @@ export function IngredientPour({ kind }: { kind: IngredientKind | null }) {
           >
             <image
               href="/assets/pouring/sugar-spoon-v1.png"
-              x="-8.7"
-              y="-121.4"
+              x="-97.7"
+              y="-331.4"
               width="390"
               height="390"
             />
           </g>
           <g className="falling-sugar">
-            {Array.from({ length: 34 }, (_, i) => (
-              <rect
+            {Array.from({ length: 56 }, (_, i) => {
+              const sourceX = 260 + ((i * 17) % 39);
+              const landingX = 408 + ((i * 11) % 25);
+              return (
+                <rect
+                  key={i}
+                  className="sugar-grain"
+                  x="0"
+                  y="0"
+                  width={1.8 + ((i * 7) % 11) / 5}
+                  height={1.5 + ((i * 3) % 9) / 5}
+                  rx=".35"
+                  fill={i % 5 ? '#fff9e7' : '#d8cbb1'}
+                  stroke={i % 7 === 0 ? '#ffffff' : 'none'}
+                  strokeWidth=".65"
+                  style={
+                    {
+                      '--grain-x': `${sourceX}px`,
+                      '--grain-arc-x': `${sourceX + 73}px`,
+                      '--grain-fall-x': `${sourceX + 118}px`,
+                      '--grain-land-x': `${landingX}px`,
+                      '--grain-land-y': `${442 + ((i * 7) % 17)}px`,
+                      '--grain-delay': `${(i * 17) % 140}ms`,
+                      '--grain-time': `${480 + ((i * 13) % 100)}ms`,
+                      '--grain-turn': `${i * 43}deg`,
+                    } as CSSProperties
+                  }
+                />
+              );
+            })}
+          </g>
+          <g className="sugar-impact" fill="#fff9e7">
+            {Array.from({ length: 6 }, (_, i) => (
+              <circle
                 key={i}
-                className="sugar-grain"
-                x="0"
-                y="0"
-                width={3 + (i % 4)}
-                height={3 + ((i * 3) % 4)}
-                rx=".7"
-                fill={i % 4 ? '#fff9e7' : '#d8cbb1'}
-                style={
-                  {
-                    '--grain-x': `${352 + ((i * 17) % 37)}px`,
-                    '--grain-drift': `${39 + ((i * 13) % 24)}px`,
-                    '--grain-delay': `${-((i * 37) % 430)}ms`,
-                    '--grain-turn': `${i * 43}deg`,
-                  } as CSSProperties
-                }
+                cx={414 + ((i * 5) % 13)}
+                cy={447 + ((i * 3) % 7)}
+                r={0.8 + (i % 2) * 0.4}
               />
             ))}
           </g>

@@ -1261,7 +1261,7 @@ h1 em {
 }
 .blend-meter {
   flex: 0 0 29px;
-  border-radius: 3px;
+  border-radius: 999px;
   overflow: hidden;
   background: #a28c7024;
   display: flex;
@@ -1610,11 +1610,16 @@ h1 em {
   opacity: 0.65;
 }
 .pour-source.sugar-spoon {
-  transform-origin: 369px 230px;
+  transform-origin: 280px 20px;
+  animation: sugar-flourish 650ms cubic-bezier(0.3, 0.05, 0.4, 0.95) infinite;
 }
 .sugar-grain {
   opacity: 0;
-  animation: grain-fall 460ms var(--grain-delay) linear infinite;
+  animation: grain-fall var(--grain-time) var(--grain-delay) linear infinite;
+}
+.sugar-impact {
+  opacity: 0;
+  animation: sugar-landing 650ms 360ms ease-out infinite;
 }
 .is-leaving .pour-source {
   animation: source-leave 360ms ease-in both;
@@ -1622,9 +1627,14 @@ h1 em {
 .is-leaving .falling-liquid {
   animation: liquid-leave 190ms ease-in both;
 }
+.is-leaving .sugar-spoon {
+  animation: sugar-source-leave 260ms ease-in both;
+}
 .is-leaving .falling-sugar {
-  opacity: 0;
-  transition: opacity 100ms;
+  animation: sugar-cascade-leave 320ms ease-out both;
+}
+.is-leaving .sugar-impact {
+  animation: sugar-impact-leave 220ms ease-out both;
 }
 @keyframes source-arrive {
   from {
@@ -1669,29 +1679,99 @@ h1 em {
     stroke-dashoffset: -139;
   }
 }
+@keyframes sugar-flourish {
+  0%,
+  100% {
+    transform: translate(-18px, -12px) rotate(-14deg);
+  }
+  25% {
+    transform: translate(5px, -22px) rotate(-2deg);
+  }
+  60% {
+    transform: translate(18px, 4px) rotate(11deg);
+  }
+}
+@keyframes sugar-source-leave {
+  from {
+    opacity: 1;
+    transform: translate(-18px, -12px) rotate(-14deg);
+  }
+  to {
+    opacity: 0;
+    transform: translate(-48px, -62px) rotate(-26deg);
+  }
+}
 @keyframes grain-fall {
   0% {
     opacity: 0;
-    transform: translate(var(--grain-x), 230px) rotate(var(--grain-turn));
+    transform: translate(var(--grain-x), 20px) rotate(var(--grain-turn));
   }
-  9% {
+  8% {
+    opacity: 0.88;
+  }
+  35% {
     opacity: 1;
+    transform: translate(var(--grain-arc-x), 94px)
+      rotate(calc(var(--grain-turn) + 48deg));
   }
   68% {
-    opacity: 0.95;
+    opacity: 0.9;
+    transform: translate(var(--grain-fall-x), 248px)
+      rotate(calc(var(--grain-turn) + 103deg));
   }
-  86% {
-    opacity: 0.4;
+  94% {
+    opacity: 0.7;
   }
   100% {
     opacity: 0;
-    transform: translate(calc(var(--grain-x) + var(--grain-drift)), 450px)
-      rotate(calc(var(--grain-turn) + 180deg));
+    transform: translate(var(--grain-land-x), var(--grain-land-y))
+      rotate(calc(var(--grain-turn) + 155deg));
   }
 }
+@keyframes sugar-landing {
+  0%,
+  100% {
+    opacity: 0;
+  }
+  35% {
+    opacity: 0.65;
+  }
+  70% {
+    opacity: 0.2;
+  }
+}
+@keyframes sugar-cascade-leave {
+  0%,
+  55% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes sugar-impact-leave {
+  from {
+    opacity: 0.35;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .ingredient-pour {
     display: none;
+  }
+  .ingredient-pour.pour-sugar {
+    display: block;
+  }
+  .pour-sugar .sugar-spoon,
+  .pour-sugar .falling-sugar {
+    display: none;
+  }
+  .pour-sugar .sugar-impact {
+    animation: none;
+    opacity: 0.55;
   }
 }
 
@@ -1710,33 +1790,36 @@ h1 em {
   stroke-linecap: round;
 }
 .spill-run {
-  stroke-width: 14;
+  stroke-width: 25;
   stroke-dasharray: 1;
   animation:
-    heavy-run 1500ms cubic-bezier(0.45, 0, 0.32, 1) both,
-    run-settle 2200ms 1500ms ease-out forwards;
+    heavy-run 580ms cubic-bezier(0.22, 0.65, 0.35, 1) both,
+    run-settle 1300ms 580ms ease-out forwards;
 }
 .spill-shadow {
   stroke: #301b0e;
-  stroke-width: 15;
+  stroke-width: 28;
   opacity: 0;
-  filter: blur(1.4px);
-  animation: spill-shadow-in 1100ms 300ms ease-in forwards;
+  filter: blur(1.5px);
+  animation: spill-shadow-in 550ms 90ms ease-out forwards;
 }
 .spill-glint {
   stroke: #fff9e9;
-  stroke-width: 0.8;
-  opacity: 0.22;
+  stroke-width: 1.2;
+  opacity: 0.35;
   stroke-dasharray: 1;
   animation:
-    heavy-run 1700ms 120ms cubic-bezier(0.45, 0, 0.32, 1) both,
-    glint-settle 2000ms 1800ms ease-out forwards;
+    heavy-run 660ms 60ms cubic-bezier(0.22, 0.65, 0.35, 1) both,
+    glint-settle 1500ms 720ms ease-out forwards;
 }
 .spill-pool {
-  animation: pool-spread 2100ms 650ms cubic-bezier(0.16, 0.65, 0.3, 1) both;
+  animation: pool-spread 1150ms 230ms cubic-bezier(0.16, 0.65, 0.3, 1) both;
 }
 .spill-lip {
-  animation: lip-roll 1800ms ease-in-out both;
+  animation: lip-roll 1400ms ease-out both;
+}
+.spill-beads {
+  animation: spill-beads-land 440ms 310ms cubic-bezier(0.2, 0.75, 0.3, 1) both;
 }
 @keyframes heavy-run {
   from {
@@ -1749,10 +1832,13 @@ h1 em {
 @keyframes pool-spread {
   from {
     opacity: 0;
-    transform: scale(0.08, 0.14);
+    transform: scale(0.06, 0.24);
   }
-  18% {
+  12% {
     opacity: 1;
+  }
+  65% {
+    transform: scale(0.94, 0.92);
   }
   to {
     opacity: 1;
@@ -1762,43 +1848,62 @@ h1 em {
 @keyframes lip-roll {
   0% {
     opacity: 0;
-    transform: translateX(-5px);
+    transform: scaleX(0.15);
   }
-  25% {
+  18% {
+    opacity: 0.95;
+    transform: scaleX(1);
+  }
+  52% {
     opacity: 0.85;
   }
-  65% {
-    opacity: 0.65;
-  }
   100% {
-    opacity: 0.2;
-    transform: translateX(0);
+    opacity: 0.38;
+    transform: scaleX(1);
   }
 }
 @keyframes run-settle {
   to {
-    stroke-width: 9;
-    opacity: 0.75;
+    stroke-width: 11;
+    opacity: 0.62;
   }
 }
 @keyframes glint-settle {
   to {
-    opacity: 0.12;
+    opacity: 0.14;
   }
 }
 @keyframes spill-shadow-in {
   to {
-    opacity: 0.14;
+    opacity: 0.13;
+  }
+}
+@keyframes spill-beads-land {
+  from {
+    opacity: 0;
+    transform: translateX(-28px) scale(0.3);
+  }
+  25% {
+    opacity: 1;
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
   }
 }
 @media (prefers-reduced-motion: reduce) {
   .spill-run,
   .spill-shadow,
-  .spill-glint {
+  .spill-glint,
+  .spill-beads {
     display: none;
   }
-  .spill-pool {
+  .spill-pool,
+  .spill-lip {
     animation: none;
+  }
+  .spill-lip {
+    opacity: 0.38;
   }
 }
 

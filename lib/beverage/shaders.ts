@@ -61,41 +61,122 @@ void main() {
   vec3 colour=mix(current.rgb,incoming,amount*(1.0-sugar));
   fragColor=vec4(colour,max(current.a,amount*.65));
 }`;
+// Sparse aeration enters the transported foam field at the pour contact.
+// Coverage stays fractional; this is never a solid cream-coloured decal.
+export const FOAM_POUR = `
+uniform sampler2D source;
+uniform vec2 centre;
+uniform float radius, strength;
+float hashFoam(vec2 p) { return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }
+void main() {
+  vec4 current=texture(source,uv);
+  vec2 d=uv-centre;
+  float r=max(radius,.008);
+  float ring=exp(-pow((length(d)-r*.72)/(r*.85),2.0));
+  vec2 grid=uv*190.0;
+  vec2 cell=floor(grid), local=fract(grid)-.5;
+  float grain=hashFoam(cell);
+  float bead=1.0-smoothstep(.12,.42,length(local));
+  float sparse=mix(.08,.70,step(.60,grain)*bead);
+  float mask=1.0-smoothstep(.46,.486,length(uv-.5));
+  float added=ring*sparse*clamp(strength,0.0,.30)*mask;
+  fragColor=vec4(clamp(current.r+added*(1.0-current.r),0.0,.88),current.g,current.ba);
+}`;
 // Marks are written into the same transported pigment and foam fields. They
 // are not a picture composited over the cup and remain deformable by stirring.
 export const FROTH_SHAPE = `
-uniform sampler2D source;
-uniform vec2 centre;
+uniform sampler2D source, photograph;
+uniform vec4 crop;
+uniform vec2 centre, drawRange;
 uniform float design, designScale, foamMode;
+float milkMask(vec3 c) {
+  // Blue/green milk content separates pale milk from amber crema. This keeps
+  // the photograph's feathery transitions without copying its coffee ground.
+  float pale=smoothstep(.35,.80,c.b/max(c.r,.01))*smoothstep(.58,.88,c.g);
+  return smoothstep(.035,.95,pale);
+}
 void main() {
   vec4 current=texture(source,uv);
   vec2 d=uv-centre;
   vec2 drawingUV=vec2(.5)+d/max(designScale,.05);
-  float mark=exp(-dot(d,d)/.00017)*.65;
+  vec2 photoUV=drawingUV;
+  float bounds=1.0;
   if(design>.5 && design<1.5) {
-    vec2 p=(drawingUV-vec2(.5,.49))/vec2(.17,.20);
-    float q=dot(p,p)-1.0;
-    float heart=q*q*q-p.x*p.x*p.y*p.y*p.y;
-    mark=(1.0-smoothstep(-.035,.035,heart))*.88;
-  } else if(design>1.5) {
-    mark=0.0;
-    for(int i=0;i<7;i++) {
-      float t=float(i)/6.0;
-      float y=.30+t*.36;
-      float spread=.145*(1.0-t*.75);
-      for(int side=-1;side<=1;side+=2) {
-        vec2 q=drawingUV-vec2(.5+float(side)*spread*.40,y);
-        q.x+=float(side)*q.y*.7;
-        q/=vec2(spread,.020+.009*(1.0-t));
-        mark=max(mark,exp(-dot(q,q)*2.2)*.90);
-      }
-    }
-    vec2 stem=(drawingUV-vec2(.5,.48))/vec2(.008,.24);
-    mark=max(mark,exp(-dot(stem,stem)*1.5)*.72);
+    // Isolate the photographed heart at the rosetta's tip, then scale that
+    // milk deposit into the current cup. Its real feathering replaces an icon.
+    vec2 heartUV=(drawingUV-.5)/vec2(.38,.48)+.5;
+    bounds=smoothstep(0.0,.025,heartUV.x)*smoothstep(0.0,.025,heartUV.y)*
+      (1.0-smoothstep(.975,1.0,heartUV.x))*(1.0-smoothstep(.975,1.0,heartUV.y));
+    photoUV=vec2(.404,.707)+clamp(heartUV,0.0,1.0)*vec2(.193,.218);
   }
-  mark*=1.0-smoothstep(.40,.46,length(uv-.5));
-  if(foamMode>.5) fragColor=vec4(mix(current.r,.93,mark),current.g,current.ba);
-  else fragColor=vec4(mix(current.rgb,vec3(.98,.91,.77),mark),max(current.a,mark*.2));
+  vec3 photographed=texture(photograph,crop.xy+photoUV*crop.zw).rgb;
+  float mark=milkMask(photographed)*bounds;
+  vec3 milkColor=mix(vec3(.972,.922,.817),photographed,.86);
+  if(design<.5) {
+    // Freehand is a soft milk deposit with photographed microtexture. Gesture
+    // taper is deliberately not invented without direction/pressure input.
+    vec2 creamUV=vec2(.38,.49)+d*1.8;
+    vec3 detail=texture(photograph,crop.xy+creamUV*crop.zw).rgb;
+    float textureTone=clamp((detail.r+detail.g+detail.b)/3.0,.55,1.0);
+    vec2 brush=d*vec2(.92,1.08);
+    float q=dot(brush,brush)/.00018;
+    mark=exp(-q*(.92+textureTone*.16))*.57;
+    milkColor=vec3(.965,.911,.79)+(detail-vec3(.94,.89,.77))*.18;
+  } else if(design>1.5) {
+    mark*=1.0-smoothstep(.445,.48,length(drawingUV-.5));
+  }
+  // Borrow only high-frequency crema material from the outer coffee annulus.
+  // This source ring excludes the photographed leaves/heart; neither design
+  // can accidentally stamp the original rosetta into the surrounding coffee.
+  float cremaPresence=0.0;
+  float microbubble=0.0;
+  vec3 cremaDetail=vec3(0.0);
+  if(design>.5) {
+    float theta=atan(d.y,d.x)+drawingUV.x*.65;
+    float annulus=.457+.012*sin(drawingUV.x*11.0+drawingUV.y*7.0);
+    vec2 cremaUV=vec2(.5)+vec2(cos(theta),sin(theta))*annulus;
+    vec2 src=crop.xy+cremaUV*crop.zw;
+    vec2 dx=vec2(crop.z*.006,0),dy=vec2(0,crop.w*.006);
+    vec3 grain=texture(photograph,src).rgb;
+    vec3 soft=(texture(photograph,src+dx).rgb+texture(photograph,src-dx).rgb+
+      texture(photograph,src+dy).rgb+texture(photograph,src-dy).rgb+grain*2.0)/6.0;
+    cremaDetail=clamp(grain-soft,vec3(-.07),vec3(.07));
+    float cupRadius=max(.12,designScale*.55556);
+    cremaPresence=(1.0-smoothstep(cupRadius*.84,cupRadius*.99,length(d)))*
+      (1.0-smoothstep(.474,.487,length(uv-.5)));
+    microbubble=smoothstep(.004,.045,dot(cremaDetail,vec3(.30,.58,.12)));
+    // Milk retains the local drink's warmth at its edge instead of reading as
+    // a bright cutout pasted onto a perfectly flat, unrelated background.
+    if(foamMode<.5) milkColor=mix(milkColor,current.rgb,.045);
+  }
+  // Both milk and surrounding crema enter the live fields, and stir together.
+  mark*=1.0-smoothstep(.472,.488,length(uv-.5));
+  mark=clamp(mark,0.0,.97);
+  float before=0.0, after=1.0;
+  if(design>.5) {
+    // A soft leading edge sweeps upward through the source milk pattern.
+    // Endpoints cover the entire cup, including the surrounding crema.
+    float scan=drawingUV.y+.008*sin(drawingUV.x*18.0);
+    before=drawRange.x<=0.0 ? 0.0 :
+      1.0-smoothstep(mix(-.10,1.10,drawRange.x)-.025,mix(-.10,1.10,drawRange.x)+.025,scan);
+    after=drawRange.y>=1.0 ? 1.0 :
+      1.0-smoothstep(mix(-.10,1.10,drawRange.y)-.025,mix(-.10,1.10,drawRange.y)+.025,scan);
+  }
+  float newlyLaid=max(0.0,after-before);
+  // Incremental alpha reaches the same final milk opacity as one full pass.
+  // Already covered pixels receive zero deposition instead of growing whiter.
+  float milkStep=mark*newlyLaid/max(.001,1.0-mark*before);
+  if(foamMode>.5) {
+    float coverage=.82+.12*milkMask(photographed);
+    float aeration=(.012+microbubble*.16)*cremaPresence*(1.0-mark);
+    float foamStep=newlyLaid/max(.001,1.0-before);
+    float baseFoam=mix(current.r,max(current.r,aeration),foamStep);
+    fragColor=vec4(mix(baseFoam,coverage,milkStep),current.g,current.ba);
+  } else {
+    vec3 warmBase=current.rgb*vec3(1.055,1.018,.965)+vec3(.006,.003,0);
+    vec3 base=mix(current.rgb,warmBase+cremaDetail*.72,cremaPresence*(1.0-mark)*newlyLaid);
+    fragColor=vec4(mix(clamp(base,0.0,1.0),milkColor,milkStep),max(current.a,mark*after*.12));
+  }
 }`;
 // R: foam coverage; G: relaxing displacement; B: surviving photographic
 // microbubbles; A: persistent local disturbance. No bubbles are generated.
@@ -396,7 +477,16 @@ void main() {
   float cover=smoothstep(.06,.96,layer.r);
   vec3 cream=vec3(.96,.895,.755)+(islands-.5)*.025;
   vec3 material=mix(color*vec3(.94,.92,.89),cream,cover);
-  color=mix(color,material,mixed*foamPresence);
+  color=mix(color,material,mixed*foamPresence*originalStyle);
+  // New drinks use their own fractional, advected aeration. Fine highlights
+  // reveal tiny bubbles while the coffee colour remains visible beneath them.
+  float freshCoverage=smoothstep(.006,.30,layer.r)*(1.0-originalStyle);
+  float milkFoam=smoothstep(.14,.28,foamPresence);
+  vec3 freshCream=mix(mix(mean,vec3(.80,.58,.31),.32),vec3(.92,.86,.72),milkFoam);
+  float micrograin=grainNoise((uv+offset)*190.0);
+  float freshOpacity=freshCoverage*foamPresence*(.42+micrograin*.58);
+  color=mix(color,freshCream,freshOpacity);
+  color+=freshCoverage*foamPresence*smoothstep(.63,.82,micrograin)*vec3(.11,.095,.065);
   // Dissolving microbubbles lose their fine photographic contrast. The broad
   // colour and remaining wall-bound bubbles survive; no synthetic fizz appears.
   vec2 bubbleStep=vec2(.0055,0);
@@ -424,8 +514,8 @@ void main() {
   vec3 reliefNormal=normalize(vec3(-slope*1.1,1.0));
   float reliefAmount=max(mixed,min(1.0,abs(layer.g)*18.0));
   float reliefLight=clamp(dot(reliefNormal,light)-light.z,-.16,.12);
-  color+=reliefLight*.34*reliefAmount*interior;
-  color*=1.0-min(.045,max(0.0,-layer.g)*.20)*interior;
+  color+=reliefLight*mix(.09,.34,originalStyle)*reliefAmount*interior;
+  color*=1.0-min(.045,max(0.0,-layer.g)*.20)*interior*mix(.30,1.0,originalStyle);
   // Sub-millimetre glints, not a moving environment map or metallic sheen.
   float wetness=dot(normal,vec2(-.55,.75))*2.4;
   vec2 vel=texture(velocity,uv).xy;
@@ -437,7 +527,7 @@ void main() {
   vec2 reflection=uv+normal*.35+slope*.018-vec2(.34,.79);
   float window=exp(-pow(abs((reflection.x+reflection.y*.55)/.14),4.0)-pow(abs(reflection.y/.023),2.0));
   float windowHalo=exp(-dot(reflection*vec2(3.0,8.0),reflection*vec2(3.0,8.0)))*.028;
-  float gloss=(window*.15+windowHalo)*interior;
+  float gloss=(window*.055+windowHalo*.65)*interior;
   color=mix(color,vec3(.98,.94,.83),gloss*(1.0-originalStyle));
   vec3 original=texture(pristine,crop.xy+uv*crop.zw).rgb;
   color=mix(color,original,pristineMix*originalStyle);
@@ -455,39 +545,39 @@ void main() {
     color=mix(color,vec3(.99,.975,.90),crystal*dissolve*.90);
   }
   float ceramicEdge=smoothstep(.493,.506,radius);
-  vec3 meniscus=color*(1.0-.20*smoothstep(.435,.493,radius));
+  vec3 meniscus=color*(1.0-.08*smoothstep(.435,.493,radius));
   vec3 fullSurface=mix(mix(meniscus,original,ceramicEdge),mix(original,color,interior),originalStyle);
   // A recessed bowl gives a pour somewhere to arrive. The pool expands and
   // rises from its lower centre; material remains the live pigment field.
   float fill=clamp(displayFill,0.0,1.0);
-  vec2 poolCentre=vec2(.5,.5-.042*(1.0-fill));
-  float poolRadius=.10+.40*pow(fill,.55);
-  vec2 poolDelta=(uv-poolCentre)*vec2(1.0,1.0+.10*(1.0-fill));
+  vec2 poolCentre=vec2(.5,.5-.025*(1.0-fill));
+  float poolRadius=.34+.16*pow(fill,.40);
+  vec2 poolDelta=(uv-poolCentre)*vec2(1.0,1.0+.045*(1.0-fill));
   float poolDistance=length(poolDelta);
   float shallow=(1.0-originalStyle)*(1.0-smoothstep(.08,.60,fill));
   float contactAngle=atan(poolDelta.y,poolDelta.x);
-  float film=(1.0-originalStyle)*step(.5,wettingBase)*(1.0-smoothstep(.035,.25,fill));
+  float film=(1.0-originalStyle)*step(.5,wettingBase)*(1.0-smoothstep(.015,.10,fill));
   // Subpixel capillary irregularity, fixed to the floor rather than wobbling.
   // The volume-driven centre and radius remain unchanged.
   float contactOffset=(sin(contactAngle*3.0+.7)*.0012+
     sin(contactAngle*7.0-1.1)*.0006)*shallow;
   // The first base pour wets a thin, gently scalloped sheet ahead of its deeper
   // pool. Its reach still grows with the same volume-driven footprint.
-  contactOffset+=film*(sin(contactAngle*5.0+.8)*.0035+sin(contactAngle*9.0-1.4)*.0016);
-  float filmReach=film*.018*smoothstep(0.0,.015,fill);
+  contactOffset+=film*(sin(contactAngle*5.0+.8)*.0012+sin(contactAngle*9.0-1.4)*.0006);
+  float filmReach=film*.005*smoothstep(0.0,.015,fill);
   float contactDistance=poolDistance-poolRadius-filmReach+contactOffset;
   float edge=1.0-smoothstep(-.004,.004,contactDistance);
-  edge*=smoothstep(0.0,.012,fill);
-  float wall=smoothstep(.24,.50,radius);
-  float bowlShade=.96-.13*wall+.028*(uv.y-.5);
+  edge*=smoothstep(0.0,1.0/60.0,fill);
+  float wall=smoothstep(.31,.50,radius);
+  float bowlShade=.985-.19*wall+.038*(uv.y-.5);
   vec3 ceramic=vec3(.895,.856,.773)*bowlShade;
   // A shallow pool contacts the ceramic. A narrow contact shadow avoids the
   // broad drop shadow that would make it read as a raised brown disc.
   float shadowWidth=mix(.018,.007,shallow);
-  float wallShadow=exp(-pow((contactDistance-.003)/shadowWidth,2.0))*(1.0-fill)*mix(.10,.045,shallow)*smoothstep(0.0,.012,fill);
+  float wallShadow=exp(-pow((contactDistance-.003)/shadowWidth,2.0))*(1.0-fill)*mix(.055,.018,shallow)*smoothstep(0.0,1.0/60.0,fill);
   ceramic*=1.0-wallShadow;
   float lip=exp(-pow((contactDistance+.0035)/.0045,2.0));
-  vec3 pool=fullSurface*(1.0-lip*.11*(1.0-fill));
+  vec3 pool=fullSurface*(1.0-lip*.05*(1.0-fill));
   // The white ceramic remains visible through the first amber sheet. Increasing
   // depth absorbs it gradually; cream/milk and the original latte bypass this.
   float clearFraction=clamp(wettingBase-1.0,0.0,1.0);
@@ -501,7 +591,7 @@ void main() {
   float impactDistance=length(uv-pourImpact.xy);
   float dimple=exp(-pow(impactDistance/.021,2.0))*pourImpact.z*film;
   float impactBank=exp(-pow((impactDistance-.028)/.008,2.0))*pourImpact.z*film;
-  pool=mix(pool,ceramic*vec3(1.04,1.03,1.0),dimple*.80);
+  pool=mix(pool,ceramic*vec3(1.04,1.03,1.0),dimple*.40);
   pool*=1.0-impactBank*.075;
   vec2 poolUV=poolDelta/max(poolRadius,.001);
   // The reflected softbox scales with the exposed liquid. The previous
@@ -510,9 +600,9 @@ void main() {
   float poolWindow=exp(-pow(abs((localReflection.x+localReflection.y*.45)/.47),4.0)-pow(abs(localReflection.y/.085),2.0));
   float poolHalo=exp(-dot(localReflection*vec2(1.7,3.0),localReflection*vec2(1.7,3.0)))*.032;
   float contactLight=max(0.0,dot(poolDelta/max(poolDistance,.001),normalize(vec2(-.5,.8))));
-  float wetEdge=exp(-pow((contactDistance+.0015)/.0026,2.0))*contactLight*.12;
+  float wetEdge=exp(-pow((contactDistance+.0015)/.0026,2.0))*contactLight*.035;
   pool*=1.0-shallow*.045*(1.0-smoothstep(.0,1.0,length(poolUV)));
-  pool=mix(pool,vec3(.96,.91,.79),shallow*(poolWindow*.16+poolHalo+wetEdge));
+  pool=mix(pool,vec3(.96,.91,.79),shallow*(poolWindow*.065+poolHalo*.55+wetEdge));
   vec3 recessed=mix(ceramic,pool,edge);
   recessed=mix(recessed,original,ceramicEdge);
   // At the photographic brim, the original Befrothed path is exact.

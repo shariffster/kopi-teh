@@ -111,20 +111,32 @@ export class BeverageSimulation {
     });
     this.steps = 0;
   }
-  shapeFroth(x: number, y: number, design = 0, designScale = 1) {
+  shapeFroth(
+    x: number,
+    y: number,
+    design = 0,
+    designScale = 1,
+    drawRange: readonly [number, number] = [0, 1],
+  ) {
     this.gpu.draw(this.programs.FROTH_SHAPE, this.pigment.write, {
       source: this.pigment.read.texture,
+      photograph: this.photo,
+      crop: this.crop,
       centre: [x, y],
       design,
       designScale,
+      drawRange: [...drawRange],
       foamMode: 0,
     });
     this.pigment.swap();
     this.gpu.draw(this.programs.FROTH_SHAPE, this.foam.write, {
       source: this.foam.read.texture,
+      photograph: this.photo,
+      crop: this.crop,
       centre: [x, y],
       design,
       designScale,
+      drawRange: [...drawRange],
       foamMode: 1,
     });
     this.foam.swap();
@@ -152,6 +164,7 @@ export class BeverageSimulation {
     preserveSurfaceColor = false,
     viscosity = 0,
     entrainment = 0,
+    foamStrength = 0,
   ) {
     this.gpu.draw(this.programs.POUR, this.pigment.write, {
       source: this.pigment.read.texture,
@@ -166,9 +179,23 @@ export class BeverageSimulation {
       entrainment,
     });
     this.pigment.swap();
+    if (foamStrength > 0) {
+      this.gpu.draw(this.programs.FOAM_POUR, this.foam.write, {
+        source: this.foam.read.texture,
+        centre: [x, y],
+        radius: radius * 2.1,
+        strength: Math.min(0.3, foamStrength),
+      });
+      this.foam.swap();
+    }
     // The new material is authoritative. Update current mean promptly so the
     // transport correction conserves the addition rather than the old latte.
     this.updateMean();
+    if (foamStrength > 0) {
+      this.gpu.draw(this.programs.COPY, this.foamReference, {
+        source: this.foamMeans[6].texture,
+      });
+    }
     if (preserveSurfaceColor) {
       this.gpu.draw(this.programs.COPY, this.referenceMean, {
         source: this.means[6].texture,
@@ -311,9 +338,11 @@ export class BeverageSimulation {
       curlFade: number;
       viscosity: number;
       retention: number;
+      transportSpeed?: number;
     },
     contacts: SurfaceContact[] = [],
   ) {
+    const transportSpeed = motion.transportSpeed ?? config.transportSpeed;
     const gpu = this.gpu,
       r = config.resolution[this.quality],
       texel = [1 / r.flow, 1 / r.flow];
@@ -372,7 +401,7 @@ export class BeverageSimulation {
     gpu.draw(this.programs.ADVECT, this.forward, {
       pigment: this.pigment.read.texture,
       velocity: this.flow.read.texture,
-      dt: dt * config.transportSpeed,
+      dt: dt * transportSpeed,
     });
     gpu.draw(this.programs.CORRECT, this.pigment.write, {
       pigment: this.pigment.read.texture,
@@ -382,7 +411,7 @@ export class BeverageSimulation {
       currentMean: this.means[6].texture,
       referenceMean: this.referenceMean.texture,
       conservationGain: config.conservationGain,
-      dt: dt * config.transportSpeed,
+      dt: dt * transportSpeed,
     });
     this.pigment.swap();
     const contactPositions = new Float32Array(8);
@@ -400,7 +429,7 @@ export class BeverageSimulation {
     gpu.draw(this.programs.ADVECT, this.foamForward, {
       pigment: this.foam.read.texture,
       velocity: this.flow.read.texture,
-      dt: dt * config.transportSpeed,
+      dt: dt * transportSpeed,
     });
     gpu.draw(this.programs.FOAM_EVOLVE, this.foam.write, {
       source: this.foam.read.texture,
@@ -408,7 +437,7 @@ export class BeverageSimulation {
       velocity: this.flow.read.texture,
       texel: [1 / r.foam, 1 / r.foam],
       dt,
-      transportSpeed: config.transportSpeed,
+      transportSpeed,
       relaxation: config.foam.relaxation,
       contactCount: Math.min(contacts.length, 2),
       contactPositions,

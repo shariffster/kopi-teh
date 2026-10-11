@@ -41,6 +41,7 @@ export class BeverageCompositor {
     originalStyle = false,
     wettingBase = 0,
     pourImpact: number[] = [0.42, 0.55, 0, 0],
+    foamAmount = 0,
   ) {
     const ripples = new Float32Array(48);
     const sugarGrains = new Float32Array(64);
@@ -54,7 +55,12 @@ export class BeverageCompositor {
     this.ripples = this.ripples.filter((r) => now - r.born < 2.5);
     this.ripples.forEach((r, i) =>
       ripples.set(
-        [r.x, r.y, now - r.born, r.strength * config.rippleStrength],
+        [
+          r.x,
+          r.y,
+          now - r.born,
+          r.strength * config.rippleStrength * (originalStyle ? 1 : 3.2),
+        ],
         i * 4,
       ),
     );
@@ -62,23 +68,25 @@ export class BeverageCompositor {
       pigment: sim.pigment.read.texture,
       foamSurface: sim.foam.read.texture,
       foamPixel: [1 / sim.foam.read.size, 1 / sim.foam.read.size],
-      foamRelief: config.foam.relief,
-      foamPresence: originalStyle ? config.foam.presence : 0,
+      foamRelief: config.foam.relief * (originalStyle ? 1 : 0.18),
+      foamPresence: originalStyle
+        ? config.foam.presence
+        : Math.min(0.35, Math.max(0, foamAmount)),
       velocity: sim.flow.read.texture,
       pristine: sim.photo,
       currentMean: sim.meanTexture,
       crop: sim.crop,
       ripples,
       sugarGrains,
-      rippleSpeed: config.rippleSpeed,
-      rippleDamping: config.rippleDamping,
+      rippleSpeed: originalStyle ? config.rippleSpeed : 0.68,
+      rippleDamping: originalStyle ? config.rippleDamping : 3.6,
       edgeGuard: config.edgeGuard,
       pristineMix,
       displayFill,
       wettingBase,
       pourImpact,
       originalStyle: originalStyle ? 1 : 0,
-      materialRelief: config.materialRelief * (originalStyle ? 1 : 0.25),
+      materialRelief: config.materialRelief * (originalStyle ? 1 : 0.08),
       mixedContrast: config.mixedContrast,
       pixel: [1 / sim.flow.read.size, 1 / sim.flow.read.size],
     });

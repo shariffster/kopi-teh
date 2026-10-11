@@ -2,6 +2,10 @@
 import { useId, type CSSProperties } from 'react';
 import type { OverflowEvent } from '@/lib/beverage/scene';
 
+// A thin wet footprint can cover more saucer than the brief, deeper run feeding it.
+const poolOutline =
+  'M568 10 C588 3 598 -13 618 -16 C636 -20 646 -31 668 -26 C681 -23 690 -29 703 -19 C715 -10 708 0 718 10 C727 22 712 36 698 35 C680 36 676 48 655 45 C634 42 627 49 610 37 C594 27 581 31 568 20Z';
+
 export function CupOverflow({ spills }: { spills: OverflowEvent[] }) {
   const uid = useId().replace(/:/g, '');
   if (!spills.length) return null;
@@ -18,7 +22,12 @@ export function CupOverflow({ spills }: { spills: OverflowEvent[] }) {
           Math.round(Math.max(0, Math.min(1, c)) * 255),
         );
         const colour = `rgb(${rgb.join(',')})`;
-        const light = `rgb(${rgb.map((c) => Math.round(c * 0.78 + 255 * 0.22)).join(',')})`;
+        const light = `rgb(${rgb.map((c) => Math.round(c * 0.82 + 255 * 0.18)).join(',')})`;
+        // Only the lateral wet footprint varies with volume; the rim stays registered.
+        const width = Math.max(
+          0.65,
+          Math.min(1.2, Math.sqrt(spill.amountMl / 8)),
+        );
         return (
           <g
             key={spill.id}
@@ -28,69 +37,82 @@ export function CupOverflow({ spills }: { spills: OverflowEvent[] }) {
           >
             <defs>
               <linearGradient id={`${id}-ribbon`} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0" stopColor={colour} stopOpacity=".68" />
-                <stop offset=".28" stopColor={light} />
-                <stop offset=".62" stopColor={colour} />
-                <stop offset="1" stopColor="#2f1b0e" stopOpacity=".84" />
+                <stop offset="0" stopColor={colour} stopOpacity=".8" />
+                <stop offset=".25" stopColor={light} />
+                <stop offset=".66" stopColor={colour} />
+                <stop offset="1" stopColor={colour} stopOpacity=".65" />
               </linearGradient>
-              <radialGradient id={`${id}-pool`} cx=".4" cy=".34" r=".7">
-                <stop offset="0" stopColor={light} stopOpacity=".86" />
-                <stop offset=".74" stopColor={colour} stopOpacity=".94" />
-                <stop offset="1" stopColor={colour} stopOpacity=".66" />
+              <radialGradient id={`${id}-pool`} cx=".32" cy=".45" r=".75">
+                <stop offset="0" stopColor={colour} stopOpacity=".93" />
+                <stop offset=".6" stopColor={light} stopOpacity=".82" />
+                <stop offset=".92" stopColor={colour} stopOpacity=".64" />
+                <stop offset="1" stopColor={colour} stopOpacity=".4" />
               </radialGradient>
             </defs>
-            <path
-              className="spill-shadow"
-              d="M485 2 C509 -3 530 5 551 9 C578 16 599 8 625 14"
-            />
-            <path
-              className="spill-run"
-              d="M485 0 C509 -5 530 3 551 7 C578 14 599 6 625 12"
-              pathLength="1"
-              stroke={`url(#${id}-ribbon)`}
-            />
-            <path
-              className="spill-glint"
-              d="M493 -3 C515 -5 533 2 550 4 C570 10 591 5 605 8"
-              pathLength="1"
-            />
-            <g className="spill-pool" style={{ transformOrigin: '552px 9px' }}>
+            <g transform={`scale(1 ${width})`}>
               <path
-                d="M548 4 C567 8 579 -4 594 -2 C608 2 613 -8 630 -3 C642 -2 650 5 645 14 C641 24 625 18 613 22 C598 27 581 17 567 17 C557 16 553 12 548 10Z"
-                fill="#3c2316"
-                opacity=".18"
-                transform="translate(2 3)"
+                className="spill-shadow"
+                d="M486 4 C512 -3 537 10 555 18 C582 31 606 17 635 20"
               />
               <path
-                d="M548 4 C567 8 579 -4 594 -2 C608 2 613 -8 630 -3 C642 -2 650 5 645 14 C641 24 625 18 613 22 C598 27 581 17 567 17 C557 16 553 12 548 10Z"
-                fill={`url(#${id}-pool)`}
-                stroke={colour}
-                strokeWidth=".8"
+                className="spill-run"
+                d="M484 0 C510 -7 536 6 554 14 C581 27 605 13 635 16"
+                pathLength="1"
+                stroke={`url(#${id}-ribbon)`}
               />
               <path
-                d="M610 0 C617 -5 626 -3 630 -2"
-                stroke="#fff9e7"
-                strokeWidth=".7"
-                strokeLinecap="round"
-                fill="none"
-                opacity=".32"
+                className="spill-lip"
+                d="M480 -13 C494 -17 508 -15 521 -7 C534 0 546 1 558 6 L558 18 C542 22 526 10 514 10 C501 11 489 15 480 10Z"
+                fill={`url(#${id}-ribbon)`}
+                style={{ transformOrigin: '480px 0px' }}
               />
               <path
-                d="M635 26 Q625 31 614 22"
-                stroke="#f1ddbc"
-                strokeWidth=".8"
-                fill="none"
-                opacity=".24"
+                className="spill-glint"
+                d="M490 -7 C514 -10 535 3 551 8 C572 19 593 13 613 12"
+                pathLength="1"
               />
+              <g
+                className="spill-pool"
+                style={{ transformOrigin: '568px 16px' }}
+              >
+                <path
+                  d={poolOutline}
+                  fill="#3c2316"
+                  opacity=".12"
+                  transform="translate(1 3)"
+                />
+                <path
+                  d={poolOutline}
+                  fill={`url(#${id}-pool)`}
+                  stroke={colour}
+                  strokeOpacity=".48"
+                  strokeWidth="1.2"
+                />
+                <path
+                  d="M628 -13 C642 -17 653 -24 667 -20 M682 34 C693 29 700 33 708 23"
+                  stroke="#fff9e7"
+                  strokeWidth="1.4"
+                  strokeLinecap="round"
+                  fill="none"
+                  opacity=".4"
+                />
+                <path
+                  d="M608 32 C626 44 638 37 653 41"
+                  stroke={colour}
+                  strokeWidth="1.7"
+                  fill="none"
+                  opacity=".3"
+                />
+              </g>
+              <g
+                className="spill-beads"
+                fill={colour}
+                style={{ transformOrigin: '600px 10px' }}
+              >
+                <ellipse cx="690" cy="-39" rx="5" ry="3" opacity=".68" />
+                <ellipse cx="726" cy="31" rx="3.5" ry="2.6" opacity=".52" />
+              </g>
             </g>
-            <ellipse
-              className="spill-lip"
-              cx="489"
-              cy="0"
-              rx="9"
-              ry="12"
-              fill={`url(#${id}-pool)`}
-            />
           </g>
         );
       })}

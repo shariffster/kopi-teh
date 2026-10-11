@@ -68,6 +68,14 @@ export class LatteScene {
   private base: DrinkBase = 'coffee';
   private material = initialMaterial('coffee');
   private pours: Pour[] = [];
+  private frothDesign: {
+    started: number;
+    lastStep: number;
+    progress: number;
+    design: number;
+    scale: number;
+    y: number;
+  } | null = null;
   private overflow = new OverflowBudget();
   private overflowId = 0;
   private originalStyle = true;
@@ -156,6 +164,7 @@ export class LatteScene {
       'visibilitychange',
       () => {
         if (!document.hidden) return;
+        this.cancelFrothDesign();
         if (this.transition) {
           const transition = this.transition;
           this.transition = null;
@@ -201,6 +210,7 @@ export class LatteScene {
     this.frame = requestAnimationFrame(this.tick);
   }
   private wake = () => {
+    this.cancelFrothDesign();
     if (!liquidVolume(this.material) || this.transition) return;
     this.disturbed = true;
     this.status = 'settling';
@@ -306,6 +316,7 @@ export class LatteScene {
     });
   }
   private cancelTransition() {
+    this.cancelFrothDesign();
     this.transition?.resolve(false);
     this.transition = null;
     this.originalRise = null;
@@ -337,9 +348,15 @@ export class LatteScene {
         impact,
         pour?.kind === 'evaporated' ? 1 : 0,
       ],
+      this.material.condensed + this.material.evaporated > 0
+        ? 0.28
+        : this.material.coffee > 0
+          ? 0.12
+          : 0,
     );
   }
   setFrothDrawing(enabled: boolean) {
+    this.cancelFrothDesign();
     if (!this.input) return;
     this.input.cancel();
     this.input.frothDrawing = enabled;
@@ -348,13 +365,14 @@ export class LatteScene {
     if (!this.canShapeFroth() || !Number.isFinite(x) || !Number.isFinite(y))
       return false;
     const fill = Math.max(0, Math.min(1, this.visualFill));
-    const poolRadius = 0.1 + 0.4 * Math.pow(fill, 0.55);
-    const centreY = 0.5 - 0.042 * (1 - fill);
+    const poolRadius = 0.34 + 0.16 * Math.pow(fill, 0.4);
+    const centreY = 0.5 - 0.025 * (1 - fill);
     if (
-      Math.hypot(x - 0.5, (y - centreY) * (1 + 0.1 * (1 - fill))) >
+      Math.hypot(x - 0.5, (y - centreY) * (1 + 0.045 * (1 - fill))) >
       poolRadius - 0.008
     )
       return false;
+    this.cancelFrothDesign();
     this.sim!.shapeFroth(x, y);
     this.disturbed = true;
     this.present(performance.now() / 1000);
@@ -363,16 +381,49 @@ export class LatteScene {
   applyFrothDesign(design: 'heart' | 'rosetta'): boolean {
     if (!this.canShapeFroth() || !['heart', 'rosetta'].includes(design))
       return false;
+    this.cancelFrothDesign();
     const fill = Math.max(0, Math.min(1, this.visualFill));
-    const poolRadius = 0.1 + 0.4 * Math.pow(fill, 0.55);
-    this.sim!.shapeFroth(
-      0.5,
-      0.5 - 0.042 * (1 - fill),
-      design === 'heart' ? 1 : 2,
-      (poolRadius / 0.5) * 0.9,
-    );
+    const poolRadius = 0.34 + 0.16 * Math.pow(fill, 0.4);
+    const y = 0.5 - 0.025 * (1 - fill);
+    const scale = (poolRadius / 0.5) * 0.9;
+    const kind = design === 'heart' ? 1 : 2;
+    const now = performance.now() / 1000;
+    if (
+      matchMedia('(prefers-reduced-motion: reduce)').matches ||
+      document.hidden
+    ) {
+      this.sim!.shapeFroth(0.5, y, kind, scale);
+    } else {
+      this.frothDesign = {
+        started: now,
+        lastStep: now - 0.04,
+        progress: 0,
+        design: kind,
+        scale,
+        y,
+      };
+    }
     this.disturbed = true;
-    this.present(performance.now() / 1000);
+    this.present(now);
+    return true;
+  }
+  private cancelFrothDesign() {
+    // Keep already laid milk in the live fields, but never resume a gesture
+    // after a pour, stir, cup change, Serve or hidden-tab interruption.
+    this.frothDesign = null;
+  }
+  private advanceFrothDesign(now: number): boolean {
+    const drawing = this.frothDesign;
+    if (!drawing || !this.sim || now - drawing.lastStep < 0.04) return false;
+    const progress = Math.min(1, Math.max(0, (now - drawing.started) / 1.08));
+    if (progress <= drawing.progress) return false;
+    this.sim.shapeFroth(0.5, drawing.y, drawing.design, drawing.scale, [
+      drawing.progress,
+      progress,
+    ]);
+    drawing.progress = progress;
+    drawing.lastStep = now;
+    if (progress >= 1) this.frothDesign = null;
     return true;
   }
   private canShapeFroth() {
@@ -399,6 +450,7 @@ export class LatteScene {
       return false;
     const next = addMaterial(this.material, kind, amount);
     if (!next) return false;
+    this.cancelFrothDesign();
     const firstLiquid = !liquidVolume(this.material) && kind !== 'sugar';
     const [px, py] = pourPoint(x, y);
     const tail = this.pours.at(-1);
@@ -470,6 +522,7 @@ export class LatteScene {
         pouring: this.pours.length > 0,
         activePour: this.pours[0]?.kind ?? null,
         displayVolume: this.displayVolume,
+        visualFill: this.visualFill,
         transitioning: this.transition !== null || this.originalRise !== null,
         originalSurface: this.originalStyle,
       },
@@ -571,6 +624,8 @@ export class LatteScene {
       const splats = this.input?.consume(dt) ?? [];
       // An empty ceramic well cannot be stirred or dented like a liquid.
       if (!liquidVolume(this.material) || this.transition) splats.length = 0;
+      if (splats.length) this.cancelFrothDesign();
+      const frothChanged = this.advanceFrothDesign(now);
       // Read only native input here, before material-pour impulses are appended.
       const spillAngle = this.overflow.advance(
         now,
@@ -581,17 +636,20 @@ export class LatteScene {
           !this.transition &&
           !this.originalRise &&
           this.pours.length === 0 &&
-          liquidVolume(this.material) >= 3,
+          liquidVolume(this.material) >= 8,
       );
       if (spillAngle !== null) {
-        const remaining = removeLiquid(this.material, 3);
+        const remaining = removeLiquid(this.material, 8);
         if (remaining) {
-          const color = materialColor(this.material);
+          // Match the inherited golden surface when that presentation is active.
+          const color = this.originalStyle
+            ? [0.59, 0.35, 0.13]
+            : materialColor(this.material);
           this.material = remaining;
           this.callbacks.onOverflow?.({
             id: ++this.overflowId,
             angle: spillAngle,
-            amountMl: 3,
+            amountMl: 8,
             recipe: { ...remaining },
             color,
           });
@@ -626,6 +684,11 @@ export class LatteScene {
         const radius =
           profile.radius +
           Math.min(0.016, Math.sqrt(pour.amount / 160) * 0.012);
+        const thinBaseOnly =
+          !this.material.condensed &&
+          !this.material.evaporated &&
+          ((pour.kind === 'coffee' && !this.material.tea) ||
+            (pour.kind === 'tea' && !this.material.coffee));
         if (pour.kind !== 'sugar')
           this.sim.pour(
             // Water carries no cream-coloured pigment into an existing beverage.
@@ -637,6 +700,7 @@ export class LatteScene {
               0.22,
               dt *
                 profile.pigment *
+                (thinBaseOnly ? 0 : 1) *
                 envelope *
                 (pour.kind === 'evaporated' ? 1.6 : 1),
             ),
@@ -645,6 +709,12 @@ export class LatteScene {
             this.originalStyle || pour.kind === 'evaporated',
             profile.viscosity,
             pour.kind === 'evaporated' ? 1 : 0,
+            !this.originalStyle &&
+              (pour.kind === 'coffee' ||
+                pour.kind === 'condensed' ||
+                pour.kind === 'evaporated')
+              ? dt * envelope * (pour.kind === 'coffee' ? 0.5 : 1.8)
+              : 0,
           );
         const impulse: Splat = {
           x: pour.x,
@@ -653,7 +723,11 @@ export class LatteScene {
           dx:
             dt *
             profile.force *
-            (pour.kind === 'evaporated' ? 3.8 : 1) *
+            (pour.kind === 'evaporated'
+              ? 3.8
+              : ['coffee', 'tea', 'water'].includes(pour.kind)
+                ? 4.5
+                : 1) *
             envelope *
             (0.8 + Math.sin(pour.age * 2.8) * 0.1),
           dy:
@@ -661,13 +735,17 @@ export class LatteScene {
             profile.force *
             envelope *
             0.46 *
-            (pour.kind === 'evaporated' ? 3.8 : 1),
+            (pour.kind === 'evaporated'
+              ? 3.8
+              : ['coffee', 'tea', 'water'].includes(pour.kind)
+                ? 4.5
+                : 1),
           spin: dt * profile.spin * envelope,
           prod: pour.kind === 'sugar' ? 0 : dt * 0.004 * envelope,
         };
         if (liquidVolume(this.material)) {
           splats.push(impulse);
-          if (pour.kind === 'evaporated') {
+          if (pour.kind !== 'sugar' && pour.kind !== 'condensed') {
             // A small opposed pair rolls the milk-bearing coffee outward. The
             // zero net spin avoids turning every addition into a giant vortex.
             for (const side of [-1, 1])
@@ -697,16 +775,28 @@ export class LatteScene {
       }
       this.motion = this.aftermath.advance(now, splats);
       const active = this.motion.active;
+      // Fresh coffee and water carry brisk shallow waves, not the inherited
+      // milk-surface's long, viscous coasting. Preserve the original exactly.
+      const thickShare =
+        this.material.condensed / Math.max(1, liquidVolume(this.material));
+      const fluidMotion = this.originalStyle
+        ? this.motion
+        : {
+            ...this.motion,
+            viscosity: 0.008 + thickShare * 0.1,
+            dissipation: this.motion.dissipation + 0.85,
+            transportSpeed: 1.25 - thickShare * 0.6,
+          };
       if (active) {
         const contacts = this.input?.surfaceContacts() ?? [];
         if (process.env.NODE_ENV === 'development') {
           const submissionStart = performance.now();
-          this.sim.step(dt, splats, this.motion, contacts);
+          this.sim.step(dt, splats, fluidMotion, contacts);
           this.submissionMs =
             this.submissionMs * 0.9 +
             (performance.now() - submissionStart) * 0.1;
         } else {
-          this.sim.step(dt, splats, this.motion, contacts);
+          this.sim.step(dt, splats, fluidMotion, contacts);
         }
         this.present(now);
       } else if (this.status !== 'still') {
@@ -714,7 +804,7 @@ export class LatteScene {
         this.status = 'still';
         this.present(now);
       }
-      if (volumeChanged && !active) this.present(now);
+      if ((volumeChanged || frothChanged) && !active) this.present(now);
       if (active && elapsed < 0.1) {
         this.avgMs = this.avgMs * 0.96 + elapsed * 1000 * 0.04;
         this.slowFrames =

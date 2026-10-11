@@ -199,10 +199,12 @@ export function useDrink(
           if (!add(kind, amount)) stopPour();
         },
         kind === 'condensed'
-          ? 820
-          : kind === 'evaporated' || kind === 'sugar'
+          ? 400
+          : kind === 'sugar'
             ? 650
-            : 450,
+            : kind === 'evaporated'
+              ? 200
+              : 120,
       );
     },
     [add, stopPour],
