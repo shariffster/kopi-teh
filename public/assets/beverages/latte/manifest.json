@@ -1,0 +1,15 @@
+{
+  "id": "latte-v0.1",
+  "scene": "/assets/beverages/latte/scene.jpg",
+  "imageSize": [1254, 1254],
+  "liquid": {
+    "center": [0.497, 0.463],
+    "radius": [0.218, 0.222],
+    "texture": null,
+    "foamMask": null,
+    "cremaTexture": null,
+    "microdetailTexture": null,
+    "normalTexture": null
+  },
+  "provenance": "Synthetic photographic-style scene generated with the built-in image_gen tool. Not a camera photograph. See ASSET_NOTES.md."
+}
