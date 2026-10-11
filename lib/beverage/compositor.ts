@@ -40,7 +40,7 @@ export class BeverageCompositor {
     displayFill = 1,
     originalStyle = false,
     wettingBase = 0,
-    pourImpact: number[] = [0.42, 0.55, 0],
+    pourImpact: number[] = [0.42, 0.55, 0, 0],
   ) {
     const ripples = new Float32Array(48);
     const sugarGrains = new Float32Array(64);

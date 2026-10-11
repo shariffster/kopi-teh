@@ -26,10 +26,10 @@ uniform vec3 baseColor;
 void main() { fragColor=vec4(baseColor,1.0); }
 `;
 export const POUR = `
-uniform sampler2D source;
+uniform sampler2D source, currentMean;
 uniform vec3 ingredientColor;
 uniform vec2 centre;
-uniform float radius, strength, phase, sugar, viscosity;
+uniform float radius, strength, phase, sugar, viscosity, entrainment;
 void main() {
   vec4 current=texture(source,uv);
   vec2 d=uv-centre;
@@ -39,6 +39,7 @@ void main() {
   vec2 fold=d;
   fold.x+=sin(d.y/max(radius,.001)*3.2+phase*.45)*radius*.18*viscosity;
   fold*=mix(vec2(1.0),vec2(.88,1.18),viscosity);
+  fold.x+=sin(d.y/max(radius,.001)*2.1+phase*.6)*radius*.32*entrainment;
   float shape=1.0+.06*sin(theta*3.0+phase*.40);
   float distance=length(fold)*shape;
   float plume=exp(-distance*distance/(radius*radius*.52));
@@ -48,9 +49,16 @@ void main() {
   float skirtDistance=(distance-radius*.90)/(radius*.50);
   float skirt=exp(-skirtDistance*skirtDistance)*fingers;
   float mask=1.0-smoothstep(.44,.48,length(uv-.5));
-  float amount=clamp((plume+.16*skirt)*strength*mask,0.0,.30);
+  float amount=clamp((plume+mix(.16,.34,entrainment)*skirt)*strength*mask,0.0,.30);
+  // Thin milk enters the coffee beneath its surface: the emerging folds carry
+  // existing coffee colour, rather than accumulating opaque white paint.
+  vec4 meanSample=texture(currentMean,vec2(.5));
+  vec3 coffeeBody=meanSample.rgb/max(meanSample.a,.001);
+  float foldedMilk=.34+.16*smoothstep(.25,.95,distance/max(radius,.001));
+  vec3 integrated=mix(coffeeBody,ingredientColor,foldedMilk);
+  vec3 incoming=mix(ingredientColor,integrated,entrainment);
   // Sugar and water disturb the surface without adding a white pigment layer.
-  vec3 colour=mix(current.rgb,ingredientColor,amount*(1.0-sugar));
+  vec3 colour=mix(current.rgb,incoming,amount*(1.0-sugar));
   fragColor=vec4(colour,max(current.a,amount*.65));
 }`;
 // Marks are written into the same transported pigment and foam fields. They
@@ -322,7 +330,7 @@ uniform float rippleSpeed, rippleDamping, edgeGuard, pristineMix, materialRelief
 uniform vec2 pixel;
 uniform vec2 foamPixel;
 uniform float foamRelief, foamPresence, displayFill, originalStyle, wettingBase;
-uniform vec3 pourImpact;
+uniform vec4 pourImpact;
 ${BOUNDARY}
 float surfaceHeight(vec2 p) {
   vec2 f=texture(foamSurface,bound(p)).rg;
@@ -352,6 +360,12 @@ void main() {
   // reveals its transported texture instead of staying painted on the vessel.
   interior=max(interior,workedRim);
   vec2 offset=normal*.12*interior;
+  vec2 impactDelta=uv-pourImpact.xy;
+  float creamImpact=pourImpact.z*pourImpact.w;
+  // A compact plunge bends the existing surface and its reflections locally.
+  // No cup-wide vortex, texture replacement or persistent white spot is added.
+  float impactLens=exp(-dot(impactDelta,impactDelta)/.0025)*creamImpact;
+  offset+=impactDelta*impactLens*.16;
   vec4 surface=texture(pigment,bound(uv+offset));
   vec3 color=surface.rgb;
   // Emulsion relief appears only in disturbed areas, never reconstructs rosetta
@@ -427,6 +441,8 @@ void main() {
   color=mix(color,vec3(.98,.94,.83),gloss*(1.0-originalStyle));
   vec3 original=texture(pristine,crop.xy+uv*crop.zw).rgb;
   color=mix(color,original,pristineMix*originalStyle);
+  float creamDimple=exp(-dot(impactDelta,impactDelta)/.00024)*creamImpact;
+  color*=1.0-creamDimple*.13;
   // Temporary crystals catch light, then dissolve. They never enter the milk
   // pigment or foam fields, so sugar cannot leave a white bloom behind.
   for(int i=0;i<16;i++) {

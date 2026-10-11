@@ -315,7 +315,7 @@ export class LatteScene {
     const pour = this.pours[0];
     const arrival = pour ? Math.max(0, pour.age - pour.arrival) : 0;
     const impact =
-      pour && ['coffee', 'tea', 'water'].includes(pour.kind)
+      pour && ['coffee', 'tea', 'water', 'evaporated'].includes(pour.kind)
         ? Math.min(1, arrival / 0.13) *
           Math.max(0, Math.min(1, (pour.duration - pour.elapsed) / 0.16))
         : 0;
@@ -331,7 +331,12 @@ export class LatteScene {
       this.visualFill,
       this.originalStyle,
       wettingBase,
-      [pour?.x ?? 0.42, pour?.y ?? 0.55, impact],
+      [
+        pour?.x ?? 0.42,
+        pour?.y ?? 0.55,
+        impact,
+        pour?.kind === 'evaporated' ? 1 : 0,
+      ],
     );
   }
   setFrothDrawing(enabled: boolean) {
@@ -612,7 +617,11 @@ export class LatteScene {
         );
         // The photographic starting cup already owns its measured pigment
         // mean. A sugar touch must not tint it toward a recipe colour model.
-        if (!this.originalStyle && pour.kind !== 'sugar')
+        if (
+          !this.originalStyle &&
+          pour.kind !== 'sugar' &&
+          pour.kind !== 'evaporated'
+        )
           this.sim.setMaterialReference(target);
         const radius =
           profile.radius +
@@ -624,11 +633,18 @@ export class LatteScene {
             pour.x,
             pour.y,
             radius,
-            Math.min(0.22, dt * profile.pigment * envelope),
+            Math.min(
+              0.22,
+              dt *
+                profile.pigment *
+                envelope *
+                (pour.kind === 'evaporated' ? 1.6 : 1),
+            ),
             pour.age * 1.6,
             pour.kind === 'water',
-            this.originalStyle,
+            this.originalStyle || pour.kind === 'evaporated',
             profile.viscosity,
+            pour.kind === 'evaporated' ? 1 : 0,
           );
         const impulse: Splat = {
           x: pour.x,
@@ -637,14 +653,34 @@ export class LatteScene {
           dx:
             dt *
             profile.force *
+            (pour.kind === 'evaporated' ? 3.8 : 1) *
             envelope *
             (0.8 + Math.sin(pour.age * 2.8) * 0.1),
-          dy: -dt * profile.force * envelope * 0.46,
+          dy:
+            -dt *
+            profile.force *
+            envelope *
+            0.46 *
+            (pour.kind === 'evaporated' ? 3.8 : 1),
           spin: dt * profile.spin * envelope,
           prod: pour.kind === 'sugar' ? 0 : dt * 0.004 * envelope,
         };
         if (liquidVolume(this.material)) {
           splats.push(impulse);
+          if (pour.kind === 'evaporated') {
+            // A small opposed pair rolls the milk-bearing coffee outward. The
+            // zero net spin avoids turning every addition into a giant vortex.
+            for (const side of [-1, 1])
+              splats.push({
+                x: pour.x + side * radius * 0.72,
+                y: pour.y - radius * 0.28,
+                radius: radius * 1.65,
+                dx: dt * 0.14 * side * envelope,
+                dy: -dt * 0.075 * envelope,
+                spin: dt * 0.2 * side * envelope,
+                prod: 0,
+              });
+          }
           if (Math.floor(pour.age * 3) !== Math.floor((pour.age - dt) * 3))
             this.compositor.addRipple(
               pour.x,
