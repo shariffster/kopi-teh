@@ -321,7 +321,8 @@ uniform vec4 sugarGrains[16];
 uniform float rippleSpeed, rippleDamping, edgeGuard, pristineMix, materialRelief, mixedContrast;
 uniform vec2 pixel;
 uniform vec2 foamPixel;
-uniform float foamRelief, foamPresence, displayFill, originalStyle;
+uniform float foamRelief, foamPresence, displayFill, originalStyle, wettingBase;
+uniform vec3 pourImpact;
 ${BOUNDARY}
 float surfaceHeight(vec2 p) {
   vec2 f=texture(foamSurface,bound(p)).rg;
@@ -449,11 +450,16 @@ void main() {
   float poolDistance=length(poolDelta);
   float shallow=(1.0-originalStyle)*(1.0-smoothstep(.08,.60,fill));
   float contactAngle=atan(poolDelta.y,poolDelta.x);
+  float film=(1.0-originalStyle)*step(.5,wettingBase)*(1.0-smoothstep(.035,.25,fill));
   // Subpixel capillary irregularity, fixed to the floor rather than wobbling.
   // The volume-driven centre and radius remain unchanged.
   float contactOffset=(sin(contactAngle*3.0+.7)*.0012+
     sin(contactAngle*7.0-1.1)*.0006)*shallow;
-  float contactDistance=poolDistance-poolRadius+contactOffset;
+  // The first base pour wets a thin, gently scalloped sheet ahead of its deeper
+  // pool. Its reach still grows with the same volume-driven footprint.
+  contactOffset+=film*(sin(contactAngle*5.0+.8)*.0035+sin(contactAngle*9.0-1.4)*.0016);
+  float filmReach=film*.018*smoothstep(0.0,.015,fill);
+  float contactDistance=poolDistance-poolRadius-filmReach+contactOffset;
   float edge=1.0-smoothstep(-.004,.004,contactDistance);
   edge*=smoothstep(0.0,.012,fill);
   float wall=smoothstep(.24,.50,radius);
@@ -466,6 +472,21 @@ void main() {
   ceramic*=1.0-wallShadow;
   float lip=exp(-pow((contactDistance+.0035)/.0045,2.0));
   vec3 pool=fullSurface*(1.0-lip*.11*(1.0-fill));
+  // The white ceramic remains visible through the first amber sheet. Increasing
+  // depth absorbs it gradually; cream/milk and the original latte bypass this.
+  float clearFraction=clamp(wettingBase-1.0,0.0,1.0);
+  vec3 filterTint=mix(vec3(.78,.54,.25),vec3(.995,.984,.952),clearFraction);
+  float centreDepth=(1.0-smoothstep(.12,.95,poolDistance/max(poolRadius+filmReach,.001)));
+  float absorption=.10+centreDepth*(.10+smoothstep(.015,.20,fill)*.50);
+  vec3 thinSheet=mix(ceramic*filterTint,fullSurface,absorption);
+  // A very narrow advancing front holds slightly more liquid than its film.
+  thinSheet*=1.0-lip*.045;
+  pool=mix(pool,thinSheet,film);
+  float impactDistance=length(uv-pourImpact.xy);
+  float dimple=exp(-pow(impactDistance/.021,2.0))*pourImpact.z*film;
+  float impactBank=exp(-pow((impactDistance-.028)/.008,2.0))*pourImpact.z*film;
+  pool=mix(pool,ceramic*vec3(1.04,1.03,1.0),dimple*.80);
+  pool*=1.0-impactBank*.075;
   vec2 poolUV=poolDelta/max(poolRadius,.001);
   // The reflected softbox scales with the exposed liquid. The previous
   // full-cup reflection lay outside a 5 ml pool and left it completely matte.

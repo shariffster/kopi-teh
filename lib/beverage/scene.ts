@@ -312,12 +312,26 @@ export class LatteScene {
   }
   private present(now: number) {
     if (!this.sim) return;
+    const pour = this.pours[0];
+    const arrival = pour ? Math.max(0, pour.age - pour.arrival) : 0;
+    const impact =
+      pour && ['coffee', 'tea', 'water'].includes(pour.kind)
+        ? Math.min(1, arrival / 0.13) *
+          Math.max(0, Math.min(1, (pour.duration - pour.elapsed) / 0.16))
+        : 0;
+    const volume = liquidVolume(this.material);
+    const wettingBase =
+      volume > 0 && !this.material.condensed && !this.material.evaporated
+        ? 1 + this.material.water / volume
+        : 0;
     this.compositor.draw(
       this.sim,
       now,
       this.disturbed ? 0 : 1,
       this.visualFill,
       this.originalStyle,
+      wettingBase,
+      [pour?.x ?? 0.42, pour?.y ?? 0.55, impact],
     );
   }
   setFrothDrawing(enabled: boolean) {

@@ -39,6 +39,8 @@ export class BeverageCompositor {
     pristineMix = 0,
     displayFill = 1,
     originalStyle = false,
+    wettingBase = 0,
+    pourImpact: number[] = [0.42, 0.55, 0],
   ) {
     const ripples = new Float32Array(48);
     const sugarGrains = new Float32Array(64);
@@ -73,6 +75,8 @@ export class BeverageCompositor {
       edgeGuard: config.edgeGuard,
       pristineMix,
       displayFill,
+      wettingBase,
+      pourImpact,
       originalStyle: originalStyle ? 1 : 0,
       materialRelief: config.materialRelief * (originalStyle ? 1 : 0.25),
       mixedContrast: config.mixedContrast,
