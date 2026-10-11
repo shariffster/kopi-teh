@@ -3,8 +3,19 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Kopi Tehory — Makeathon demo</title>
-<style>html{color:#35281e;background:#e9dfce;font-family:Georgia,serif}body{max-width:1100px;margin:5vh auto;padding:24px}header{display:flex;justify-content:space-between;align-items:center;gap:24px}h1{font-size:clamp(28px,4vw,48px);font-weight:400}a{color:inherit}video{display:block;width:100%;background:#101a16;box-shadow:0 12px 45px #35281e20}p{font:15px/1.6 system-ui,sans-serif;color:#655342}</style>
-<header><h1>Kopi <i>Tehory</i></h1><a href="/">Make your own cup →</a></header>
+<style>html{color:#35281e;background:#e9dfce;font-family:Georgia,serif}body{max-width:1100px;margin:5vh auto;padding:24px}header{display:flex;justify-content:space-between;align-items:center;gap:24px;padding-bottom:24px}h1{font-size:clamp(28px,4vw,48px);font-weight:400;margin:0 0 12px}h1 span{display:block;font:600 20px/1.4 system-ui,sans-serif;margin-top:12px}.intro{margin:0;max-width:48ch}a{color:inherit}video{display:block;width:100%;background:#101a16;box-shadow:0 12px 45px #35281e20}p{font:15px/1.6 system-ui,sans-serif;color:#655342}
+.app-cta{display:inline-flex;align-items:center;justify-content:center;gap:20px;min-height:56px;box-sizing:border-box;padding:16px 24px;border-radius:4px;background:#35281e;color:#f6f1e6;font:600 16px/1.4 system-ui,sans-serif;text-decoration:none;white-space:nowrap;transition:background-color 160ms ease-out}
+.app-cta:hover{background:#6a472e}
+.app-cta:active{background:#221b16}
+.app-cta:focus-visible{outline:3px solid #6a472e;outline-offset:4px}
+.app-cta svg{width:22px;height:22px;flex:none}
+.try-it{display:flex;align-items:center;justify-content:space-between;gap:24px;padding:20px 0 8px}
+.try-it p{margin:0;font-size:18px;color:#35281e}
+@media(max-width:640px){body{margin:20px auto;padding:20px}header{align-items:flex-start;flex-direction:column;gap:20px;padding-bottom:24px}h1{margin:0 0 12px}header .app-cta,.try-it .app-cta{width:100%}.try-it{align-items:stretch;flex-direction:column;gap:16px}.app-cta{white-space:normal;text-align:center}}
+@media(prefers-reduced-motion:reduce){.app-cta{transition:none}}
+</style>
+<header><div><h1>Kopi <i>Tehory</i><span>Demo video</span></h1><p class="intro">Watch the 1:43 walkthrough, then open the interactive app to make your own cup.</p></div><a class="app-cta" href="/">Try the interactive app <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12h16m-6-6 6 6-6 6"/></svg></a></header>
 <video controls playsinline preload="metadata" poster="poster.jpg" aria-label="Kopi Tehory, 1 minute 43 second makeathon demonstration"><source src="kopi-tehory.mp4?v=continuous-4" type="video/mp4"></video>
 <p>Common Ground Makeathon · Culture × Tech + Design × Tech · 1:43</p>
+<section class="try-it" aria-label="Try Kopi Tehory"><p>Your turn. Pour, stir and make it yours.</p><a class="app-cta" href="/">Try the interactive app <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12h16m-6-6 6 6-6 6"/></svg></a></section>
 </html>
