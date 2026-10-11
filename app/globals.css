@@ -1179,3 +1179,82 @@ h1 em {
     gap: 12px;
   }
 }
+
+/* Froth tools stay within the cup's workspace, separate from the ingredient shelf. */
+.surface-tools {
+  position: absolute;
+  bottom: 48px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  pointer-events: auto;
+  color: #493526;
+  max-width: calc(100vw - 36px);
+  width: max-content;
+}
+.surface-tool-actions,
+.froth-options {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+}
+.surface-tools button {
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  white-space: nowrap;
+  border-bottom: 1px solid #6d52344d;
+}
+.surface-tools button:hover:not(:disabled),
+.surface-tools button[aria-pressed='true'] {
+  color: #221b16;
+  border-bottom-color: currentColor;
+}
+.surface-tools button:disabled {
+  opacity: 0.42;
+  cursor: default;
+}
+.froth-options {
+  padding: 8px 16px;
+  margin-bottom: 5px;
+  background: #f4ecdedb;
+  border-radius: 4px;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+}
+.froth-options > span {
+  font-size: 10px;
+  width: 100%;
+  text-align: center;
+}
+.surface-canvas.is-drawing-froth {
+  cursor: crosshair;
+}
+.surface-canvas[aria-busy='true'] {
+  pointer-events: none;
+}
+.cup-focus .surface-tools {
+  bottom: 117px;
+}
+@media (max-width: 760px) {
+  .surface-tools {
+    bottom: 37px;
+  }
+  .surface-tools button {
+    min-height: 36px;
+    font-size: 10px;
+  }
+  .surface-tool-actions {
+    gap: 20px;
+  }
+  .cup-focus .surface-tools {
+    bottom: 136px;
+  }
+}
+
+.liquid-window.original-surface {
+  background: transparent;
+}

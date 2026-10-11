@@ -15,6 +15,7 @@ import {
   INGREDIENT_COLORS,
   type DrinkBase,
   type PourIngredient,
+  type MaterialAmounts,
 } from './mixing';
 
 type Pour = {
@@ -34,6 +35,7 @@ export interface SceneCallbacks {
   onError: (message: string) => void;
   onMetrics?: (message: string) => void;
   onReset?: (base: DrinkBase) => void;
+  onResetRequest?: () => void;
 }
 export class LatteScene {
   private gpu: GPU | null = null;
@@ -58,6 +60,17 @@ export class LatteScene {
   private base: DrinkBase = 'coffee';
   private material = initialMaterial('coffee');
   private pours: Pour[] = [];
+  private originalStyle = true;
+  private displayVolume = 140;
+  private visualFill = 1;
+  private originalRise: { started: number; duration: number } | null = null;
+  private transition: {
+    started: number;
+    duration: number;
+    fromVolume: number;
+    fromFill: number;
+    resolve: (completed: boolean) => void;
+  } | null = null;
   status: SceneStatus = 'still';
   constructor(
     readonly canvas: HTMLCanvasElement,
@@ -99,7 +112,7 @@ export class LatteScene {
         crop,
       );
     }
-    this.sim.reset(materialColor(this.material));
+    this.sim.resetOriginal();
     const resize = () => {
       if (
         this.disposed ||
@@ -119,11 +132,7 @@ export class LatteScene {
         h = Math.max(1, Math.round(height * dpr));
       if (this.canvas.width !== w) this.canvas.width = w;
       if (this.canvas.height !== h) this.canvas.height = h;
-      this.compositor.draw(
-        this.sim,
-        performance.now() / 1000,
-        this.disturbed ? 0 : 1,
-      );
+      this.present(performance.now() / 1000);
     };
     this.resize = resize;
     this.observer = new ResizeObserver(resize);
@@ -133,6 +142,24 @@ export class LatteScene {
       signal: this.abort.signal,
     });
     window.addEventListener('pageshow', resize, { signal: this.abort.signal });
+    document.addEventListener(
+      'visibilitychange',
+      () => {
+        if (!document.hidden) return;
+        if (this.transition) {
+          const transition = this.transition;
+          this.transition = null;
+          this.resetDrink('empty');
+          transition.resolve(true);
+        }
+        if (this.originalRise) {
+          this.originalRise = null;
+          this.displayVolume = liquidVolume(this.material);
+          this.visualFill = 1;
+        }
+      },
+      { signal: this.abort.signal },
+    );
     this.canvas.addEventListener(
       'webglcontextlost',
       (e) => {
@@ -157,18 +184,23 @@ export class LatteScene {
       () => this.reserve(),
     );
     this.input.observer = this.inputObserver;
+    this.input.onFrothDraw = this.shapeFroth;
     resize();
     this.status = 'ready';
     this.canvas.dataset.ready = 'true';
     this.frame = requestAnimationFrame(this.tick);
   }
   private wake = () => {
-    if (!liquidVolume(this.material)) return;
+    if (!liquidVolume(this.material) || this.transition) return;
     this.disturbed = true;
     this.status = 'settling';
     this.callbacks.onInteract();
   };
   reserve = () => {
+    if (this.callbacks.onResetRequest) {
+      this.callbacks.onResetRequest();
+      return true;
+    }
     const reset = this.resetDrink(this.base);
     if (reset) this.callbacks.onReset?.(this.base);
     return reset;
@@ -180,6 +212,7 @@ export class LatteScene {
       this.canvas.dataset.ready !== 'true'
     )
       return false;
+    this.cancelTransition();
     this.input?.cancel();
     this.base = base;
     this.material = initialMaterial(base);
@@ -188,11 +221,137 @@ export class LatteScene {
     this.aftermath.reset();
     this.reserveStart = -100;
     this.disturbed = false;
+    this.originalStyle = false;
+    this.displayVolume = liquidVolume(this.material);
+    this.visualFill = Math.min(1, this.displayVolume / 300);
     this.sim.reset(materialColor(this.material));
     this.status = 'still';
     this.canvas.dataset.state = 'still';
-    this.compositor.draw(this.sim, performance.now() / 1000);
+    this.present(performance.now() / 1000);
     return true;
+  }
+  restoreOriginal(recipe: MaterialAmounts, animate = false): boolean {
+    if (
+      !this.sim ||
+      this.canvas.dataset.ready !== 'true' ||
+      Object.keys(INGREDIENT_COLORS).some((key) => {
+        const value = recipe[key as PourIngredient];
+        return !Number.isFinite(value) || value < 0;
+      }) ||
+      liquidVolume(recipe) <= 0 ||
+      liquidVolume(recipe) > 300 ||
+      recipe.sugar > 30
+    )
+      return false;
+    this.cancelTransition();
+    this.input?.cancel();
+    this.material = { ...recipe };
+    this.base = recipe.tea > recipe.coffee ? 'tea' : 'coffee';
+    this.pours = [];
+    this.compositor.reset();
+    this.aftermath.reset();
+    this.disturbed = false;
+    this.originalStyle = true;
+    const rise = animate && !document.hidden;
+    this.displayVolume = rise ? 0 : liquidVolume(recipe);
+    // The inherited finished photograph is a full presentation, independent
+    // of its illustrative recipe. New cups use the visible capacity model.
+    this.visualFill = rise ? 0 : 1;
+    this.originalRise = rise
+      ? {
+          started: performance.now() / 1000,
+          duration: matchMedia('(prefers-reduced-motion: reduce)').matches
+            ? 0.1
+            : 0.4,
+        }
+      : null;
+    this.sim.resetOriginal();
+    this.status = 'still';
+    this.canvas.dataset.state = 'still';
+    this.present(performance.now() / 1000);
+    return true;
+  }
+  transitionToEmpty(): Promise<boolean> {
+    if (!this.sim || this.disposed || this.canvas.dataset.ready !== 'true')
+      return Promise.resolve(false);
+    this.cancelTransition();
+    this.input?.cancel();
+    this.pours = [];
+    if (this.displayVolume < 0.05 || document.hidden) {
+      return Promise.resolve(this.resetDrink('empty'));
+    }
+    this.status = 'settling';
+    return new Promise((resolve) => {
+      this.transition = {
+        started: performance.now() / 1000,
+        duration: matchMedia('(prefers-reduced-motion: reduce)').matches
+          ? 0.1
+          : 0.48,
+        fromVolume: this.displayVolume,
+        fromFill: this.visualFill,
+        resolve,
+      };
+    });
+  }
+  private cancelTransition() {
+    this.transition?.resolve(false);
+    this.transition = null;
+    this.originalRise = null;
+  }
+  private present(now: number) {
+    if (!this.sim) return;
+    this.compositor.draw(
+      this.sim,
+      now,
+      this.disturbed ? 0 : 1,
+      this.visualFill,
+      this.originalStyle,
+    );
+  }
+  setFrothDrawing(enabled: boolean) {
+    if (!this.input) return;
+    this.input.cancel();
+    this.input.frothDrawing = enabled;
+  }
+  shapeFroth = (x: number, y: number): boolean => {
+    if (!this.canShapeFroth() || !Number.isFinite(x) || !Number.isFinite(y))
+      return false;
+    const fill = Math.max(0, Math.min(1, this.visualFill));
+    const poolRadius = 0.1 + 0.4 * Math.pow(fill, 0.55);
+    const centreY = 0.5 - 0.042 * (1 - fill);
+    if (
+      Math.hypot(x - 0.5, (y - centreY) * (1 + 0.1 * (1 - fill))) >
+      poolRadius - 0.008
+    )
+      return false;
+    this.sim!.shapeFroth(x, y);
+    this.disturbed = true;
+    this.present(performance.now() / 1000);
+    return true;
+  };
+  applyFrothDesign(design: 'heart' | 'rosetta'): boolean {
+    if (!this.canShapeFroth() || !['heart', 'rosetta'].includes(design))
+      return false;
+    const fill = Math.max(0, Math.min(1, this.visualFill));
+    const poolRadius = 0.1 + 0.4 * Math.pow(fill, 0.55);
+    this.sim!.shapeFroth(
+      0.5,
+      0.5 - 0.042 * (1 - fill),
+      design === 'heart' ? 1 : 2,
+      (poolRadius / 0.5) * 0.9,
+    );
+    this.disturbed = true;
+    this.present(performance.now() / 1000);
+    return true;
+  }
+  private canShapeFroth() {
+    return !!(
+      this.sim &&
+      this.canvas.dataset.ready === 'true' &&
+      !this.transition &&
+      liquidVolume(this.material) > 0 &&
+      this.material.condensed + this.material.evaporated > 0
+    );
   }
   pourIngredient(
     kind: PourIngredient,
@@ -202,6 +361,7 @@ export class LatteScene {
   ): boolean {
     if (
       !this.sim ||
+      this.transition ||
       this.canvas.dataset.ready !== 'true' ||
       this.pours.length >= 24
     )
@@ -278,6 +438,9 @@ export class LatteScene {
         amounts: { ...this.material },
         volume: liquidVolume(this.material),
         pouring: this.pours.length > 0,
+        displayVolume: this.displayVolume,
+        transitioning: this.transition !== null || this.originalRise !== null,
+        originalSurface: this.originalStyle,
       },
     };
   }
@@ -299,17 +462,13 @@ export class LatteScene {
       gl.bindFramebuffer(gl.FRAMEBUFFER, null);
       gl.clearColor(1, 0, 1, 1);
       gl.clear(gl.COLOR_BUFFER_BIT);
-    } else
-      this.compositor.draw(
-        this.sim,
-        performance.now() / 1000,
-        this.disturbed ? 0 : 1,
-      );
+    } else this.present(performance.now() / 1000);
   }
   private fail(message: string) {
     this.canvas.dataset.ready = 'false';
     cancelAnimationFrame(this.frame);
     this.input?.cancel();
+    this.cancelTransition();
     this.callbacks.onError(message);
   }
   private tick = (milliseconds: number) => {
@@ -328,13 +487,55 @@ export class LatteScene {
     const now = milliseconds / 1000;
     const elapsed = this.previous ? now - this.previous : 1 / 60;
     this.previous = now;
+    let volumeChanged = false;
+    if (this.transition) {
+      const transition = this.transition;
+      const progress = Math.min(
+        1,
+        (now - transition.started) / transition.duration,
+      );
+      const eased = 1 - Math.pow(1 - progress, 3);
+      this.displayVolume = transition.fromVolume * (1 - eased);
+      this.visualFill = transition.fromFill * (1 - eased);
+      volumeChanged = true;
+      if (progress >= 1) {
+        this.transition = null;
+        this.resetDrink('empty');
+        transition.resolve(true);
+      }
+    } else if (this.originalRise) {
+      const progress = Math.min(
+        1,
+        (now - this.originalRise.started) / this.originalRise.duration,
+      );
+      const eased = 1 - Math.pow(1 - progress, 3);
+      this.displayVolume = liquidVolume(this.material) * eased;
+      this.visualFill = eased;
+      volumeChanged = true;
+      if (progress >= 1) this.originalRise = null;
+    } else {
+      const targetVolume = liquidVolume(this.material);
+      if (Math.abs(this.displayVolume - targetVolume) > 0.03) {
+        const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+        this.displayVolume +=
+          (targetVolume - this.displayVolume) *
+          (1 - Math.exp(-Math.min(elapsed, 0.1) * (reduced ? 45 : 12)));
+        volumeChanged = true;
+      } else if (this.displayVolume !== targetVolume) {
+        this.displayVolume = targetVolume;
+        volumeChanged = true;
+      }
+      this.visualFill = this.originalStyle
+        ? 1
+        : Math.min(1, this.displayVolume / 300);
+    }
     if (!document.hidden) {
       // Cap simulation time instead of performing catch-up passes: doubling GPU
       // work on a late frame creates a feedback slowdown on phones.
       const dt = Math.min(elapsed, 1 / 30);
       const splats = this.input?.consume(dt) ?? [];
       // An empty ceramic well cannot be stirred or dented like a liquid.
-      if (!liquidVolume(this.material)) splats.length = 0;
+      if (!liquidVolume(this.material) || this.transition) splats.length = 0;
       const pour = this.pours[0];
       if (pour) {
         pour.elapsed = Math.min(pour.duration, pour.elapsed + dt);
@@ -342,7 +543,10 @@ export class LatteScene {
         const target = pour.from.map(
           (value, i) => value + (pour.to[i] - value) * progress,
         );
-        this.sim.setMaterialReference(target);
+        // The photographic starting cup already owns its measured pigment
+        // mean. A sugar touch must not tint it toward a recipe colour model.
+        if (!this.originalStyle && pour.kind !== 'sugar')
+          this.sim.setMaterialReference(target);
         const radius =
           pour.kind === 'sugar'
             ? 0.035
@@ -356,6 +560,7 @@ export class LatteScene {
           Math.min(0.7, dt * 16),
           progress * 5,
           pour.kind === 'sugar' || pour.kind === 'water',
+          this.originalStyle,
         );
         const impulse: Splat = {
           x: pour.x,
@@ -388,12 +593,13 @@ export class LatteScene {
         } else {
           this.sim.step(dt, splats, this.motion, contacts);
         }
-        this.compositor.draw(this.sim, now);
+        this.present(now);
       } else if (this.status !== 'still') {
         this.sim.park();
         this.status = 'still';
-        this.compositor.draw(this.sim, now, this.disturbed ? 0 : 1);
+        this.present(now);
       }
+      if (volumeChanged && !active) this.present(now);
       if (active && elapsed < 0.1) {
         this.avgMs = this.avgMs * 0.96 + elapsed * 1000 * 0.04;
         this.slowFrames =
@@ -421,6 +627,7 @@ export class LatteScene {
   }
   dispose() {
     this.disposed = true;
+    this.cancelTransition();
     this.canvas.dataset.ready = 'false';
     cancelAnimationFrame(this.frame);
     this.observer?.disconnect();

@@ -92,6 +92,50 @@ export class BeverageSimulation {
     });
     this.steps = 0;
   }
+  resetOriginal() {
+    for (const target of this.allocated) this.gpu.clear(target);
+    this.gpu.draw(this.programs.SEED, this.pigment.read, {
+      photograph: this.photo,
+      crop: this.crop,
+    });
+    this.gpu.draw(this.programs.FOAM_SEED, this.foam.read, {
+      photograph: this.photo,
+      crop: this.crop,
+    });
+    this.updateMean();
+    this.gpu.draw(this.programs.COPY, this.referenceMean, {
+      source: this.means[6].texture,
+    });
+    this.gpu.draw(this.programs.COPY, this.foamReference, {
+      source: this.foamMeans[6].texture,
+    });
+    this.steps = 0;
+  }
+  shapeFroth(x: number, y: number, design = 0, designScale = 1) {
+    this.gpu.draw(this.programs.FROTH_SHAPE, this.pigment.write, {
+      source: this.pigment.read.texture,
+      centre: [x, y],
+      design,
+      designScale,
+      foamMode: 0,
+    });
+    this.pigment.swap();
+    this.gpu.draw(this.programs.FROTH_SHAPE, this.foam.write, {
+      source: this.foam.read.texture,
+      centre: [x, y],
+      design,
+      designScale,
+      foamMode: 1,
+    });
+    this.foam.swap();
+    this.updateMean();
+    this.gpu.draw(this.programs.COPY, this.referenceMean, {
+      source: this.means[6].texture,
+    });
+    this.gpu.draw(this.programs.COPY, this.foamReference, {
+      source: this.foamMeans[6].texture,
+    });
+  }
   setMaterialReference(color: readonly number[]) {
     this.gpu.draw(this.programs.MATERIAL_REFERENCE, this.referenceMean, {
       baseColor: [...color],
@@ -105,6 +149,7 @@ export class BeverageSimulation {
     strength: number,
     phase: number,
     sugar: boolean,
+    preserveSurfaceColor = false,
   ) {
     this.gpu.draw(this.programs.POUR, this.pigment.write, {
       source: this.pigment.read.texture,
@@ -119,6 +164,11 @@ export class BeverageSimulation {
     // The new material is authoritative. Update current mean promptly so the
     // transport correction conserves the addition rather than the old latte.
     this.updateMean();
+    if (preserveSurfaceColor) {
+      this.gpu.draw(this.programs.COPY, this.referenceMean, {
+        source: this.means[6].texture,
+      });
+    }
   }
   inspectForTest() {
     if (process.env.NODE_ENV !== 'development') return undefined;

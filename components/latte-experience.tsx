@@ -10,6 +10,7 @@ import {
   Check,
   ChevronLeft,
   ChevronRight,
+  Paintbrush,
 } from 'lucide-react';
 import { useDrink } from './use-drink';
 import {
@@ -76,6 +77,7 @@ export function LatteExperience() {
   const [about, setAbout] = useState(false);
   const [focused, setFocused] = useState(false);
   const [trayOpen, setTrayOpen] = useState(false);
+  const [frothOpen, setFrothOpen] = useState(false);
   const notes = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     if (about) notes.current?.showModal();
@@ -83,7 +85,10 @@ export function LatteExperience() {
   }, [about]);
   const recipe = drink.recipe,
     total = totalLiquidMl(recipe),
-    name = recipeName(recipe);
+    name =
+      drink.selectedPreset === 'original'
+        ? 'Original latte'
+        : recipeName(recipe);
   const disabled = !drink.ready || drink.preparing || drink.served;
   const activeIngredient = INGREDIENTS.find((i) => i.id === drink.pouring);
   return (
@@ -138,7 +143,7 @@ export function LatteExperience() {
               fetchPriority="high"
             />
             <div
-              className="liquid-window"
+              className={`liquid-window ${drink.selectedPreset === 'original' ? 'original-surface' : ''}`}
               style={{
                 left: `${(latteAsset.liquid.center[0] - latteAsset.liquid.radius[0]) * 100}%`,
                 top: `${(latteAsset.liquid.center[1] - latteAsset.liquid.radius[1]) * 100}%`,
@@ -148,10 +153,15 @@ export function LatteExperience() {
             >
               <canvas
                 ref={canvas}
-                className="surface-canvas"
+                className={`surface-canvas ${drink.drawingFroth ? 'is-drawing-froth' : ''}`}
+                aria-busy={drink.preparing}
                 role="application"
                 tabIndex={drink.served ? -1 : 0}
-                aria-label="Drink surface. Drag in circles to stir. Arrow keys stir; space makes a ripple; R empties the cup."
+                aria-label={
+                  drink.drawingFroth
+                    ? 'Froth surface. Drag to draw in the milk. Arrow keys draw; space adds a dot. R empties the cup.'
+                    : 'Drink surface. Drag in circles to stir. Arrow keys stir; space makes a ripple; R empties the cup.'
+                }
               />
               {activeIngredient && (
                 <div
@@ -164,18 +174,77 @@ export function LatteExperience() {
               )}
             </div>
           </div>
+          {!drink.served && (
+            <div className={`surface-tools ${frothOpen ? 'is-open' : ''}`}>
+              {frothOpen && (
+                <div className="froth-options" aria-label="Froth designs">
+                  <button
+                    disabled={
+                      disabled || recipe.condensed + recipe.evaporated === 0
+                    }
+                    onClick={() => drink.designFroth('heart')}
+                  >
+                    Heart
+                  </button>
+                  <button
+                    disabled={
+                      disabled || recipe.condensed + recipe.evaporated === 0
+                    }
+                    onClick={() => drink.designFroth('rosetta')}
+                  >
+                    Rosetta
+                  </button>
+                  <button
+                    disabled={
+                      disabled || recipe.condensed + recipe.evaporated === 0
+                    }
+                    aria-pressed={drink.drawingFroth}
+                    onClick={() => drink.setFrothDrawing(!drink.drawingFroth)}
+                  >
+                    {drink.drawingFroth ? 'Back to stirring' : 'Draw your own'}
+                  </button>
+                  {recipe.condensed + recipe.evaporated === 0 && (
+                    <span>Add milk to shape the surface.</span>
+                  )}
+                </div>
+              )}
+              <div className="surface-tool-actions">
+                <button
+                  disabled={!drink.ready || drink.preparing}
+                  aria-expanded={frothOpen}
+                  onClick={() => {
+                    setFrothOpen(!frothOpen);
+                    if (frothOpen) drink.setFrothDrawing(false);
+                  }}
+                >
+                  <Paintbrush size={13} />{' '}
+                  {frothOpen ? 'Close froth tools' : 'Shape the froth'}
+                </button>
+                <button
+                  disabled={!drink.ready || drink.preparing}
+                  onClick={() => drink.choosePreset('original')}
+                >
+                  Original latte <RotateCcw size={12} />
+                </button>
+              </div>
+            </div>
+          )}
           <p className="surface-instruction" aria-live="polite">
             {drink.error
               ? 'The cup needs a moment.'
               : !drink.ready
                 ? 'Warming your cup…'
-                : drink.served
-                  ? 'Made by you. Enjoy the moment.'
-                  : activeIngredient
-                    ? `Adding ${activeIngredient.label.toLowerCase()}…`
-                    : total
-                      ? 'Drag the surface. Stir it your way.'
-                      : 'An empty cup. Every possibility.'}
+                : drink.draining
+                  ? 'Making room for your next cup…'
+                  : drink.drawingFroth
+                    ? 'Draw through the milk. Make your mark.'
+                    : drink.served
+                      ? 'Made by you. Enjoy the moment.'
+                      : activeIngredient
+                        ? `Adding ${activeIngredient.label.toLowerCase()}…`
+                        : total
+                          ? 'Drag the surface. Stir it your way.'
+                          : 'An empty cup. Every possibility.'}
           </p>
         </div>
         <section
@@ -275,7 +344,13 @@ export function LatteExperience() {
           inert={focused}
         >
           <div className="ticket-heading">
-            <span>{drink.served ? 'Made your way' : 'Your cup'}</span>
+            <span>
+              {drink.served
+                ? 'Made your way'
+                : drink.selectedPreset === 'original'
+                  ? 'Illustrative starting mix'
+                  : 'Your cup'}
+            </span>
             {drink.served ? <Check size={14} /> : <span>300 ml cup</span>}
           </div>
           <h2>{name}</h2>
@@ -299,17 +374,19 @@ export function LatteExperience() {
           </dl>
           <p className="sweetness-note">{sweetnessLabel(recipe)}</p>
           <p className="recipe-context">
-            {drink.selectedPreset === 'empty'
-              ? 'Begin anywhere. Make a cup that is yours.'
-              : drink.selectedPreset === 'kopi-o'
-                ? 'O means no milk. Coffee, water and a little sweetness.'
-                : drink.selectedPreset === 'kopi-c'
-                  ? 'C calls for evaporated milk. Sugar is a separate choice.'
-                  : drink.selectedPreset === 'teh'
-                    ? 'Tea meets sweetened milk. A familiar pause in the day.'
-                    : drink.selectedPreset === 'kopi'
-                      ? 'Coffee softened with sweetened condensed milk. A kopitiam favourite.'
-                      : 'Your proportions, your interpretation. That is how a familiar drink becomes personal.'}
+            {drink.selectedPreset === 'original'
+              ? 'Befrothed’s original latte surface. The amounts here are an illustrative starting mix, not a recipe inferred from the image.'
+              : drink.selectedPreset === 'empty'
+                ? 'Begin anywhere. Make a cup that is yours.'
+                : drink.selectedPreset === 'kopi-o'
+                  ? 'O means no milk. Coffee, water and a little sweetness.'
+                  : drink.selectedPreset === 'kopi-c'
+                    ? 'C calls for evaporated milk. Sugar is a separate choice.'
+                    : drink.selectedPreset === 'teh'
+                      ? 'Tea meets sweetened milk. A familiar pause in the day.'
+                      : drink.selectedPreset === 'kopi'
+                        ? 'Coffee softened with sweetened condensed milk. A kopitiam favourite.'
+                        : 'Your proportions, your interpretation. That is how a familiar drink becomes personal.'}
           </p>
           {drink.error ? (
             <>

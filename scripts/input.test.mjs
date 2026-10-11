@@ -274,3 +274,68 @@ test('two fingers produce two independent dents and blur releases both', () => {
   assert.deepEqual(h.input.surfaceContacts(), []);
   h.input.dispose();
 });
+
+test('froth strokes stay inside the cup without stirring, ripples or surface dents', () => {
+  const h = harness(), draws = [];
+  h.input.frothDrawing = true;
+  h.input.onFrothDraw = (x, y) => draws.push({ x, y });
+  h.fire('pointerdown', 0.35, 0.5, 0, 'touch');
+  h.fire('pointermove', 0.65, 0.6, 60, 'touch');
+  h.fire('pointermove', 1.1, 0.5, 100, 'touch');
+  assert.ok(draws.length > 2, 'a moving stroke draws interpolated marks');
+  assert.ok(draws.every(({ x, y }) => Math.hypot(x - 0.5, y - 0.5) < 0.479));
+  assert.deepEqual(h.input.consume(1 / 60), []);
+  assert.deepEqual(h.input.surfaceContacts(), []);
+  assert.equal(h.counts().ripples, 0);
+  h.fire('pointercancel', 1.1, 0.5, 110, 'touch');
+  assert.equal(h.input.held, false);
+  const count = draws.length;
+  h.fire('pointermove', 0.5, 0.5, 120, 'touch');
+  assert.equal(draws.length, count, 'cancelled strokes cannot continue drawing');
+  h.input.dispose();
+});
+
+test('froth keyboard input draws marks while R retains the shared reset action', () => {
+  const h = harness(), draws = [];
+  h.input.frothDrawing = true;
+  h.input.onFrothDraw = (x, y) => draws.push({ x, y });
+  for (const key of ['ArrowRight', 'ArrowLeft', ' ']) {
+    const event = new Event('keydown', { cancelable: true });
+    Object.defineProperty(event, 'key', { value: key });
+    h.canvas.dispatchEvent(event);
+    assert.equal(event.defaultPrevented, true);
+  }
+  assert.equal(draws.length, 3);
+  assert.deepEqual(h.input.consume(1 / 60), []);
+  assert.equal(h.counts().ripples, 0);
+  const reset = new Event('keydown', { cancelable: true });
+  Object.defineProperty(reset, 'key', { value: 'r' });
+  h.canvas.dispatchEvent(reset);
+  assert.equal(h.counts().reserves, 1);
+  assert.equal(draws.length, 3);
+  h.input.dispose();
+});
+
+test('leaving froth mode cancels the active stroke and restores ordinary stirring', () => {
+  const h = harness(), draws = [];
+  h.input.frothDrawing = true;
+  h.input.onFrothDraw = (x, y) => draws.push({ x, y });
+  h.fire('pointerdown', 0.4, 0.5, 0);
+  h.fire('pointermove', 0.5, 0.6, 50);
+  // Scene mode changes cancel input before switching its interaction mode.
+  h.input.cancel();
+  h.input.frothDrawing = false;
+  const count = draws.length;
+  h.fire('pointermove', 0.6, 0.5, 60);
+  assert.deepEqual(h.input.consume(1 / 60), []);
+  assert.equal(h.input.held, false);
+  h.fire('pointerdown', 0.4, 0.5, 100);
+  h.fire('pointermove', 0.6, 0.5, 120);
+  assert.equal(h.input.surfaceContacts().length, 1);
+  h.fire('pointerup', 0.6, 0.5, 130);
+  const splats = h.input.consume(1 / 60);
+  assert.ok(splats.some((s) => Math.hypot(s.dx, s.dy) > 0));
+  assert.ok(h.counts().ripples > 0);
+  assert.equal(draws.length, count);
+  h.input.dispose();
+});

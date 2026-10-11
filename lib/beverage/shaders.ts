@@ -48,6 +48,42 @@ void main() {
   vec3 colour=mix(current.rgb,ingredientColor,amount*(1.0-sugar));
   fragColor=vec4(colour,max(current.a,amount*.65));
 }`;
+// Marks are written into the same transported pigment and foam fields. They
+// are not a picture composited over the cup and remain deformable by stirring.
+export const FROTH_SHAPE = `
+uniform sampler2D source;
+uniform vec2 centre;
+uniform float design, designScale, foamMode;
+void main() {
+  vec4 current=texture(source,uv);
+  vec2 d=uv-centre;
+  vec2 drawingUV=vec2(.5)+d/max(designScale,.05);
+  float mark=exp(-dot(d,d)/.00017)*.65;
+  if(design>.5 && design<1.5) {
+    vec2 p=(drawingUV-vec2(.5,.49))/vec2(.17,.20);
+    float q=dot(p,p)-1.0;
+    float heart=q*q*q-p.x*p.x*p.y*p.y*p.y;
+    mark=(1.0-smoothstep(-.035,.035,heart))*.88;
+  } else if(design>1.5) {
+    mark=0.0;
+    for(int i=0;i<7;i++) {
+      float t=float(i)/6.0;
+      float y=.30+t*.36;
+      float spread=.145*(1.0-t*.75);
+      for(int side=-1;side<=1;side+=2) {
+        vec2 q=drawingUV-vec2(.5+float(side)*spread*.40,y);
+        q.x+=float(side)*q.y*.7;
+        q/=vec2(spread,.020+.009*(1.0-t));
+        mark=max(mark,exp(-dot(q,q)*2.2)*.90);
+      }
+    }
+    vec2 stem=(drawingUV-vec2(.5,.48))/vec2(.008,.24);
+    mark=max(mark,exp(-dot(stem,stem)*1.5)*.72);
+  }
+  mark*=1.0-smoothstep(.40,.46,length(uv-.5));
+  if(foamMode>.5) fragColor=vec4(mix(current.r,.93,mark),current.g,0,1);
+  else fragColor=vec4(mix(current.rgb,vec3(.98,.91,.77),mark),max(current.a,mark*.2));
+}`;
 // R: persistent foam coverage; G: signed, relaxing surface displacement.
 // This is an artistic thin-layer model, not measured foam chemistry.
 export const FOAM_SEED = `
@@ -265,7 +301,7 @@ uniform vec4 ripples[12];
 uniform float rippleSpeed, rippleDamping, edgeGuard, pristineMix, materialRelief, mixedContrast;
 uniform vec2 pixel;
 uniform vec2 foamPixel;
-uniform float foamRelief, foamPresence;
+uniform float foamRelief, foamPresence, displayFill, originalStyle;
 ${BOUNDARY}
 float surfaceHeight(vec2 p) {
   vec2 f=texture(foamSurface,bound(p)).rg;
@@ -327,7 +363,7 @@ void main() {
   float bank=smoothstep(.012,.075,max(0.0,layer.g));
   vec3 coffee=mix(mean,vec3(.47,.24,.10),.32);
   color=mix(color,coffee,cavity*.28*interior);
-  color=mix(color,mean+vec3(.13,.11,.075),bank*.14*interior);
+  color=mix(color,mix(mean+vec3(.13,.11,.075),cream,originalStyle),bank*mix(.14,.22*(.35+.65*cover),originalStyle)*interior);
   // Shade over a physical patch rather than individual texels: thin pigment
   // strands should not acquire the steep, bright rims of crumpled foil.
   vec2 normalStep=max(foamPixel*2.0,vec2(.009));
@@ -352,14 +388,31 @@ void main() {
   float window=exp(-pow(abs((reflection.x+reflection.y*.55)/.14),4.0)-pow(abs(reflection.y/.023),2.0));
   float windowHalo=exp(-dot(reflection*vec2(3.0,8.0),reflection*vec2(3.0,8.0)))*.028;
   float gloss=(window*.15+windowHalo)*interior;
-  color=mix(color,vec3(.98,.94,.83),gloss);
+  color=mix(color,vec3(.98,.94,.83),gloss*(1.0-originalStyle));
   vec3 original=texture(pristine,crop.xy+uv*crop.zw).rgb;
-  // No pristine photo blend: reset and idle both present the current recipe.
-  // Always present opaque photo-matched pixels, even in the square's corners.
-  // CSS clips independently. No transparent-but-colored raw framebuffer region.
+  color=mix(color,original,pristineMix*originalStyle);
   float ceramicEdge=smoothstep(.493,.506,radius);
   vec3 meniscus=color*(1.0-.20*smoothstep(.435,.493,radius));
-  fragColor=vec4(mix(meniscus,original,ceramicEdge),1.0);
+  vec3 fullSurface=mix(mix(meniscus,original,ceramicEdge),mix(original,color,interior),originalStyle);
+  // A recessed bowl gives a pour somewhere to arrive. The pool expands and
+  // rises from its lower centre; material remains the live pigment field.
+  float fill=clamp(displayFill,0.0,1.0);
+  vec2 poolCentre=vec2(.5,.5-.042*(1.0-fill));
+  float poolRadius=.10+.40*pow(fill,.55);
+  float poolDistance=length((uv-poolCentre)*vec2(1.0,1.0+.10*(1.0-fill)));
+  float edge=1.0-smoothstep(poolRadius-.005,poolRadius+.005,poolDistance);
+  edge*=smoothstep(0.0,.012,fill);
+  float wall=smoothstep(.24,.50,radius);
+  float bowlShade=.96-.13*wall+.028*(uv.y-.5);
+  vec3 ceramic=vec3(.895,.856,.773)*bowlShade;
+  float wallShadow=exp(-pow((poolDistance-poolRadius-.007)/.018,2.0))*(1.0-fill)*.10*smoothstep(0.0,.012,fill);
+  ceramic*=1.0-wallShadow;
+  float lip=exp(-pow((poolDistance-poolRadius+.004)/.006,2.0));
+  vec3 pool=fullSurface*(1.0-lip*.13*(1.0-fill));
+  vec3 recessed=mix(ceramic,pool,edge);
+  recessed=mix(recessed,original,ceramicEdge);
+  // At the photographic brim, the original Befrothed path is exact.
+  fragColor=vec4(mix(recessed,fullSurface,smoothstep(.97,1.0,fill)),1.0);
 }
 `;
 

@@ -13,12 +13,17 @@ import {
   DRINK_PRESETS,
   EMPTY_RECIPE,
   totalLiquidMl,
+  recipeFromPreset,
   type DrinkRecipe,
   type IngredientAddition,
   type IngredientKind,
 } from '@/lib/drink-recipe';
 
 type Snapshot = { recipe: DrinkRecipe; preset: string | null };
+// The inherited latte is artwork. Its editable amounts are an illustrative starting recipe.
+const ORIGINAL_RECIPE = recipeFromPreset(
+  DRINK_PRESETS.find((p) => p.id === 'kopi')!,
+);
 type DevContext = Parameters<
   typeof import('@/lib/beverage/dev-probe').registerProbe
 >[0];
@@ -34,22 +39,28 @@ export function useDrink(
   const scene = useRef<LatteScene | null>(null);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState('');
-  const [recipe, setRecipe] = useState<DrinkRecipe>({ ...EMPTY_RECIPE });
-  const [selectedPreset, setSelectedPreset] = useState<string | null>('kopi');
+  const [recipe, setRecipe] = useState<DrinkRecipe>({ ...ORIGINAL_RECIPE });
+  const [selectedPreset, setSelectedPreset] = useState<string | null>(
+    'original',
+  );
   const [served, setServed] = useState(false);
   const [pouring, setPouring] = useState<IngredientKind | null>(null);
   const [preparing, setPreparing] = useState(false);
+  const [draining, setDraining] = useState(false);
+  const [drawingFroth, setDrawingFroth] = useState(false);
+  const preparationId = useRef(0);
   const [canUndo, setCanUndo] = useState(false);
   const [generation, setGeneration] = useState(0);
   const readyRef = useRef(false);
-  const recipeRef = useRef<DrinkRecipe>({ ...EMPTY_RECIPE });
-  const presetRef = useRef<string | null>('kopi');
+  const recipeRef = useRef<DrinkRecipe>({ ...ORIGINAL_RECIPE });
+  const presetRef = useRef<string | null>('original');
   const servedRef = useRef(false);
   const preparingRef = useRef(false);
   const started = useRef(false);
   const history = useRef<Snapshot[]>([]);
   const holdTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const sequenceTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pourReleaseTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const publishRecipe = useCallback((next: DrinkRecipe) => {
     recipeRef.current = next;
@@ -63,12 +74,34 @@ export function useDrink(
     servedRef.current = false;
     setServed(false);
   }, []);
+  const releaseStream = useCallback(() => {
+    if (pourReleaseTimer.current !== null)
+      clearInterval(pourReleaseTimer.current);
+    const finish = () => {
+      if (
+        !readyRef.current ||
+        !scene.current ||
+        !scene.current.diagnostics().drink.pouring
+      ) {
+        if (pourReleaseTimer.current !== null)
+          clearInterval(pourReleaseTimer.current);
+        pourReleaseTimer.current = null;
+        if (!preparingRef.current) setPouring(null);
+      }
+    };
+    pourReleaseTimer.current = setInterval(finish, 40);
+  }, []);
   const stopPour = useCallback(() => {
     if (holdTimer.current !== null) clearInterval(holdTimer.current);
     holdTimer.current = null;
-    if (!preparingRef.current) setPouring(null);
-  }, []);
+    if (!preparingRef.current) releaseStream();
+  }, [releaseStream]);
   const cancelPreparation = useCallback(() => {
+    preparationId.current += 1;
+    if (pourReleaseTimer.current !== null)
+      clearInterval(pourReleaseTimer.current);
+    pourReleaseTimer.current = null;
+    setDraining(false);
     if (sequenceTimer.current !== null) clearInterval(sequenceTimer.current);
     sequenceTimer.current = null;
     preparingRef.current = false;
@@ -91,10 +124,11 @@ export function useDrink(
       preparingRef.current = true;
       setPreparing(true);
       let index = 0;
+      let rejected = 0;
       const advance = () => {
         if (!readyRef.current || !scene.current) return;
         if (scene.current.diagnostics().drink.pouring) return;
-        const dose = sequence[index++];
+        const dose = sequence[index];
         if (!dose) {
           if (sequenceTimer.current !== null)
             clearInterval(sequenceTimer.current);
@@ -107,8 +141,20 @@ export function useDrink(
         const next = addIngredient(recipeRef.current, dose.kind, dose.amount);
         const accepted = next[dose.kind] - recipeRef.current[dose.kind];
         if (accepted > 0 && scene.current.pourIngredient(dose.kind, accepted)) {
+          index += 1;
+          rejected = 0;
           publishRecipe(next);
           setPouring(dose.kind);
+        } else if (accepted <= 0) {
+          index += 1;
+        } else if (++rejected >= 3) {
+          if (sequenceTimer.current !== null)
+            clearInterval(sequenceTimer.current);
+          sequenceTimer.current = null;
+          preparingRef.current = false;
+          setPreparing(false);
+          setPouring(null);
+          setError('The pour paused. Reload the cup to continue.');
         }
       };
       sequenceTimer.current = setInterval(advance, 40);
@@ -133,9 +179,11 @@ export function useDrink(
       remember();
       publishRecipe(next);
       publishPreset(null);
+      setPouring(kind);
+      releaseStream();
       return true;
     },
-    [publishPreset, publishRecipe, remember],
+    [publishPreset, publishRecipe, releaseStream, remember],
   );
 
   const startPour = useCallback(
@@ -151,19 +199,39 @@ export function useDrink(
     [add, stopPour],
   );
 
-  const choosePreset = useCallback(
-    (id: string): boolean => {
-      if (!readyRef.current || !scene.current) return false;
-      const preset = DRINK_PRESETS.find((item) => item.id === id);
-      if (id !== 'empty' && !preset) return false;
-      if (!scene.current.resetDrink('empty')) return false;
-      remember();
+  const replaceCup = useCallback(
+    (target: Snapshot) => {
+      const engine = scene.current;
+      if (!readyRef.current || !engine) return false;
       stopPour();
       cancelPreparation();
       unserve();
-      publishRecipe({ ...EMPTY_RECIPE });
-      publishPreset(id);
-      if (preset) applySequence(preset.sequence);
+      engine.setFrothDrawing(false);
+      setDrawingFroth(false);
+      preparingRef.current = true;
+      setPreparing(true);
+      setDraining(true);
+      const id = preparationId.current;
+      void engine.transitionToEmpty().then((completed) => {
+        if (
+          !completed ||
+          id !== preparationId.current ||
+          engine !== scene.current ||
+          !readyRef.current
+        )
+          return;
+        setDraining(false);
+        publishPreset(target.preset);
+        if (target.preset === 'original') {
+          engine.restoreOriginal(target.recipe, true);
+          publishRecipe(target.recipe);
+          preparingRef.current = false;
+          setPreparing(false);
+        } else {
+          publishRecipe({ ...EMPTY_RECIPE });
+          applySequence(recipeSequence(target.recipe));
+        }
+      });
       return true;
     },
     [
@@ -171,38 +239,77 @@ export function useDrink(
       cancelPreparation,
       publishPreset,
       publishRecipe,
-      remember,
       stopPour,
       unserve,
     ],
   );
-
+  const choosePreset = useCallback(
+    (id: string): boolean => {
+      if (!readyRef.current || !scene.current) return false;
+      const preset = DRINK_PRESETS.find((item) => item.id === id);
+      if (id !== 'empty' && id !== 'original' && !preset) return false;
+      remember();
+      return replaceCup({
+        recipe:
+          id === 'original'
+            ? ORIGINAL_RECIPE
+            : preset
+              ? recipeFromPreset(preset)
+              : { ...EMPTY_RECIPE },
+        preset: id,
+      });
+    },
+    [remember, replaceCup],
+  );
   const undo = useCallback((): boolean => {
     const previous = history.current.at(-1);
     if (
       !readyRef.current ||
+      preparingRef.current ||
       !scene.current ||
-      !previous ||
-      !scene.current.resetDrink('empty')
+      !previous
     )
       return false;
     history.current.pop();
     setCanUndo(history.current.length > 0);
-    stopPour();
-    cancelPreparation();
-    unserve();
-    publishRecipe({ ...EMPTY_RECIPE });
-    publishPreset(previous.preset);
-    applySequence(recipeSequence(previous.recipe));
-    return true;
-  }, [
-    applySequence,
-    cancelPreparation,
-    publishPreset,
-    publishRecipe,
-    stopPour,
-    unserve,
-  ]);
+    return replaceCup(previous);
+  }, [replaceCup]);
+  const setFrothDrawing = useCallback(
+    (enabled: boolean) => {
+      if (
+        !scene.current ||
+        !readyRef.current ||
+        preparingRef.current ||
+        servedRef.current
+      )
+        return;
+      if (
+        enabled &&
+        recipeRef.current.condensed + recipeRef.current.evaporated <= 0
+      )
+        return;
+      stopPour();
+      scene.current.setFrothDrawing(enabled);
+      setDrawingFroth(enabled);
+    },
+    [stopPour],
+  );
+  const designFroth = useCallback(
+    (design: 'heart' | 'rosetta') => {
+      if (
+        !scene.current ||
+        !readyRef.current ||
+        preparingRef.current ||
+        servedRef.current
+      )
+        return false;
+      stopPour();
+      scene.current.setFrothDrawing(false);
+      setDrawingFroth(false);
+      return scene.current.applyFrothDesign(design);
+    },
+    [stopPour],
+  );
 
   const serve = useCallback((): boolean => {
     if (
@@ -212,11 +319,15 @@ export function useDrink(
     )
       return false;
     stopPour();
+    scene.current?.setFrothDrawing(false);
+    setDrawingFroth(false);
     servedRef.current = true;
     setServed(true);
     return true;
   }, [stopPour]);
   const retry = useCallback(() => {
+    scene.current?.setFrothDrawing(false);
+    setDrawingFroth(false);
     stopPour();
     cancelPreparation();
     readyRef.current = false;
@@ -229,17 +340,22 @@ export function useDrink(
     if (!canvasRef.current || !photoRef.current) return;
     let disposed = false;
     const lifecycle = new AbortController();
+    setDrawingFroth(false);
     readyRef.current = false;
     setReady(false);
     const engine = new LatteScene(canvasRef.current, photoRef.current, {
       onInteract: () => {},
       onError: (message) => {
         if (disposed) return;
+        setDrawingFroth(false);
         readyRef.current = false;
         setReady(false);
         stopPour();
         cancelPreparation();
         setError(message);
+      },
+      onResetRequest: () => {
+        choosePreset('empty');
       },
       onReset: (base) => {
         stopPour();
@@ -265,14 +381,13 @@ export function useDrink(
         const firstStart = !started.current;
         started.current = true;
         const previous = { ...recipeRef.current };
-        engine.resetDrink('empty');
-        publishRecipe({ ...EMPTY_RECIPE });
-        if (firstStart) {
-          publishPreset('kopi');
-          applySequence(
-            DRINK_PRESETS.find((item) => item.id === 'kopi')!.sequence,
-          );
+        if (firstStart || presetRef.current === 'original') {
+          engine.restoreOriginal(ORIGINAL_RECIPE);
+          publishRecipe({ ...ORIGINAL_RECIPE });
+          publishPreset('original');
         } else {
+          engine.resetDrink('empty');
+          publishRecipe({ ...EMPTY_RECIPE });
           applySequence(recipeSequence(previous));
         }
         const modelContext = (
@@ -367,6 +482,7 @@ export function useDrink(
   }, [
     applySequence,
     cancelPreparation,
+    choosePreset,
     canvasRef,
     generation,
     photoRef,
@@ -385,6 +501,10 @@ export function useDrink(
     served,
     pouring,
     preparing,
+    draining,
+    drawingFroth,
+    setFrothDrawing,
+    designFroth,
     canUndo,
     scene,
     add,

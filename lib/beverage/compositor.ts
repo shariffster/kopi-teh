@@ -15,7 +15,13 @@ export class BeverageCompositor {
   reset() {
     this.ripples = [];
   }
-  draw(sim: BeverageSimulation, now: number, _pristineMix = 0) {
+  draw(
+    sim: BeverageSimulation,
+    now: number,
+    pristineMix = 0,
+    displayFill = 1,
+    originalStyle = false,
+  ) {
     const ripples = new Float32Array(48);
     this.ripples = this.ripples.filter((r) => now - r.born < 2.5);
     this.ripples.forEach((r, i) =>
@@ -29,8 +35,7 @@ export class BeverageCompositor {
       foamSurface: sim.foam.read.texture,
       foamPixel: [1 / sim.foam.read.size, 1 / sim.foam.read.size],
       foamRelief: config.foam.relief,
-      // Milk colour is material, not foam coverage. Retain only liquid relief.
-      foamPresence: 0,
+      foamPresence: originalStyle ? config.foam.presence : 0,
       velocity: sim.flow.read.texture,
       pristine: sim.photo,
       currentMean: sim.meanTexture,
@@ -39,8 +44,10 @@ export class BeverageCompositor {
       rippleSpeed: config.rippleSpeed,
       rippleDamping: config.rippleDamping,
       edgeGuard: config.edgeGuard,
-      pristineMix: 0,
-      materialRelief: config.materialRelief * 0.25,
+      pristineMix,
+      displayFill,
+      originalStyle: originalStyle ? 1 : 0,
+      materialRelief: config.materialRelief * (originalStyle ? 1 : 0.25),
       mixedContrast: config.mixedContrast,
       pixel: [1 / sim.flow.read.size, 1 / sim.flow.read.size],
     });

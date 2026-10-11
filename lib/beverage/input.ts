@@ -30,6 +30,8 @@ export interface InputSample {
 }
 export class BeverageInput {
   observer?: (sample: InputSample) => void;
+  frothDrawing = false;
+  onFrothDraw?: (x: number, y: number) => void;
   private contacts = new Map<number, Contact>();
   private queue: Splat[] = [];
   private abort = new AbortController();
@@ -109,6 +111,11 @@ export class BeverageInput {
       speed: 0,
     });
     this.report(e.pointerId, this.contacts.get(e.pointerId)!, 'down');
+    if (this.frothDrawing) {
+      this.onFrothDraw?.(p.x, p.y);
+      this.canvas.classList.add('is-dragging');
+      return;
+    }
     this.queue.push({ ...p, dx: 0, dy: 0, radius, spin: 0, prod: 0.03 });
     this.ripple(p.x, p.y, 1);
     this.wake();
@@ -140,7 +147,9 @@ export class BeverageInput {
           x: contact.x + (dx * i) / steps,
           y: contact.y + (dy * i) / steps,
         };
-        if (this.inside(q))
+        if (this.inside(q) && this.frothDrawing) {
+          this.onFrothDraw?.(q.x, q.y);
+        } else if (this.inside(q))
           this.queue.push({
             ...q,
             dx: (dx / steps) * gain,
@@ -150,7 +159,7 @@ export class BeverageInput {
             prod: 0,
           });
       }
-      if (distance > 0.035 && this.inside(next))
+      if (!this.frothDrawing && distance > 0.035 && this.inside(next))
         this.ripple(next.x, next.y, Math.min(speed * 0.3, 0.65));
       contact.x = next.x;
       contact.y = next.y;
@@ -204,6 +213,10 @@ export class BeverageInput {
       holdSeconds: 0,
       time: performance.now(),
     });
+    if (this.frothDrawing) {
+      this.onFrothDraw?.(x, y);
+      return;
+    }
     this.queue.push({
       x,
       y,
@@ -216,6 +229,10 @@ export class BeverageInput {
     this.wake();
   };
   prod(x = 0.5, y = 0.5) {
+    if (this.frothDrawing) {
+      this.onFrothDraw?.(x, y);
+      return;
+    }
     this.observer?.({
       id: -1,
       pointerType: 'keyboard',
@@ -246,6 +263,7 @@ export class BeverageInput {
     return this.contacts.size > 0;
   }
   surfaceContacts(): SurfaceContact[] {
+    if (this.frothDrawing) return [];
     const now = performance.now();
     const surface: SurfaceContact[] = [];
     for (const c of this.contacts.values()) {
@@ -264,6 +282,10 @@ export class BeverageInput {
     return surface;
   }
   consume(dt: number) {
+    if (this.frothDrawing) {
+      this.queue.length = 0;
+      return [];
+    }
     // Cap the per-pass uniform budget without discarding integrated stroke force.
     const pending = this.queue.splice(0);
     const result: Splat[] = [];
