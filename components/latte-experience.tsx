@@ -22,7 +22,6 @@ import {
   RECIPE_NOTES,
   recipeFromPreset,
   recipeName,
-  sweetnessLabel,
   totalLiquidMl,
   type DrinkRecipe,
 } from '@/lib/drink-recipe';
@@ -343,50 +342,75 @@ export function LatteExperience() {
           aria-label="Your cup recipe"
           inert={focused}
         >
-          <div className="ticket-heading">
-            <span>
-              {drink.served
-                ? 'Made your way'
-                : drink.selectedPreset === 'original'
-                  ? 'Illustrative starting mix'
-                  : 'Your cup'}
-            </span>
-            {drink.served ? <Check size={14} /> : <span>300 ml cup</span>}
-          </div>
-          <h2>{name}</h2>
-          <p className="cup-quantity">
-            <strong>{total}</strong> ml liquid{' '}
-            <span>· {recipe.sugar} g added sugar</span>
+          <h2 className="blend-title">
+            Your <em>blend.</em>
+          </h2>
+          <p className="blend-name">
+            {name}
+            {drink.served && <Check size={13} />}
           </p>
-          <Composition recipe={recipe} />
-          <dl className="recipe-lines">
-            {INGREDIENTS.map((i) => (
-              <div key={i.id} className={recipe[i.id] ? 'has-ingredient' : ''}>
-                <dt>
-                  <span style={{ background: i.color }} />
-                  {i.label}
-                </dt>
-                <dd>
-                  {recipe[i.id]} <span>{i.unit}</span>
-                </dd>
-              </div>
-            ))}
-          </dl>
-          <p className="sweetness-note">{sweetnessLabel(recipe)}</p>
-          <p className="recipe-context">
+          <p className="blend-volume">
+            <strong>{total}</strong>{' '}
+            <span>
+              ml <span className="blend-capacity">/ {LIQUID_CAPACITY_ML}</span>
+            </span>
+          </p>
+          <div className="blend-readout">
+            <figure
+              className="blend-meter"
+              aria-label={`${total} of ${LIQUID_CAPACITY_ML} ml capacity filled`}
+            >
+              {INGREDIENTS.filter(
+                (i) => i.unit === 'ml' && recipe[i.id] > 0,
+              ).map((i) => (
+                <span
+                  key={i.id}
+                  style={{
+                    height: `${(recipe[i.id] / LIQUID_CAPACITY_ML) * 100}%`,
+                    background: i.color,
+                  }}
+                  title={`${i.label}: ${recipe[i.id]} ml`}
+                />
+              ))}
+            </figure>
+            <dl
+              className={`blend-ingredients ${INGREDIENTS.filter((i) => i.unit === 'ml' && recipe[i.id] > 0).length > 4 ? 'is-dense' : ''}`}
+            >
+              {INGREDIENTS.filter((i) => i.unit === 'ml' && recipe[i.id] > 0)
+                .reverse()
+                .map((i) => (
+                  <div key={i.id}>
+                    <dt>
+                      <span style={{ background: i.color }} />
+                      {i.label}
+                    </dt>
+                    <dd>
+                      {recipe[i.id]} <span>ml</span>
+                      <small>
+                        {((recipe[i.id] / total) * 100).toFixed(0)}%
+                      </small>
+                    </dd>
+                  </div>
+                ))}
+              {!total && (
+                <div className="blend-empty">
+                  An empty cup.
+                  <br />
+                  Begin with a pour.
+                </div>
+              )}
+            </dl>
+          </div>
+          <div className="blend-sugar">
+            <span>Added sugar</span>
+            <span>
+              {recipe.sugar} <small>g</small>
+            </span>
+          </div>
+          <p className="blend-note">
             {drink.selectedPreset === 'original'
-              ? 'Befrothed’s original latte surface. The amounts here are an illustrative starting mix, not a recipe inferred from the image.'
-              : drink.selectedPreset === 'empty'
-                ? 'Begin anywhere. Make a cup that is yours.'
-                : drink.selectedPreset === 'kopi-o'
-                  ? 'O means no milk. Coffee, water and a little sweetness.'
-                  : drink.selectedPreset === 'kopi-c'
-                    ? 'C calls for evaporated milk. Sugar is a separate choice.'
-                    : drink.selectedPreset === 'teh'
-                      ? 'Tea meets sweetened milk. A familiar pause in the day.'
-                      : drink.selectedPreset === 'kopi'
-                        ? 'Coffee softened with sweetened condensed milk. A kopitiam favourite.'
-                        : 'Your proportions, your interpretation. That is how a familiar drink becomes personal.'}
+              ? 'Illustrative starting mix.'
+              : 'Shares of liquid. Sugar is separate.'}
           </p>
           {drink.error ? (
             <>
@@ -464,19 +488,12 @@ export function LatteExperience() {
                 disabled={!drink.ready}
                 onClick={() => drink.choosePreset(p.id)}
               >
+                <span className="preset-title">{p.label}</span>
                 <MiniCup recipe={r} />
-                <span className="preset-copy">
-                  <span className="preset-title">{p.label}</span>
-                  <small>{summaries[p.id] ?? 'Begin with your own pour'}</small>
-                  <Composition recipe={r} small />
+                <span className="preset-detail">
+                  {summaries[p.id] ?? 'Begin with your own pour'}
                 </span>
-                <span className="preset-action">
-                  {drink.selectedPreset === p.id
-                    ? 'Yours'
-                    : p.id === 'empty'
-                      ? 'Free mix'
-                      : 'Try it'}
-                </span>
+                <Composition recipe={r} small />
               </button>
             );
           })}

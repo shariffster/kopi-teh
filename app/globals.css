@@ -1258,3 +1258,352 @@ h1 em {
 .liquid-window.original-surface {
   background: transparent;
 }
+
+/* The composition lives on the table, with the same restraint as the ingredient shelf. */
+.recipe-ticket {
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
+  width: 204px;
+  top: 140px;
+}
+.recipe-ticket .blend-title {
+  font-size: 38px;
+  line-height: 1.05;
+  margin: 0 0 8px;
+  letter-spacing: -1.1px;
+}
+.blend-title em {
+  font-weight: 400;
+}
+.blend-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #6a503b;
+}
+.blend-volume {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  margin: 24px 0 18px;
+  font-size: 11px;
+}
+.blend-volume strong {
+  font:
+    32px/1 Georgia,
+    serif;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.8px;
+}
+.blend-capacity {
+  color: #735b43;
+}
+.blend-readout {
+  display: flex;
+  gap: 18px;
+  height: 210px;
+  margin-bottom: 20px;
+}
+.blend-meter {
+  flex: 0 0 29px;
+  border-radius: 3px;
+  overflow: hidden;
+  background: #a28c7024;
+  display: flex;
+  flex-direction: column-reverse;
+}
+.blend-meter > span {
+  flex: none;
+  width: 100%;
+  transition: height 200ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.blend-ingredients {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 17px;
+  min-width: 0;
+}
+.blend-ingredients dt {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: #493526;
+}
+.blend-ingredients dt > span {
+  width: 5px;
+  height: 5px;
+  flex: none;
+  border-radius: 1px;
+}
+.blend-ingredients dd {
+  display: flex;
+  align-items: baseline;
+  gap: 3px;
+  padding-left: 10px;
+  margin-top: 5px;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+.blend-ingredients dd > span {
+  font-size: 9px;
+  color: #735b43;
+}
+.blend-ingredients dd small {
+  margin-left: auto;
+  font-size: 10px;
+  color: #735b43;
+}
+.blend-empty {
+  font-size: 12px;
+  line-height: 1.7;
+  color: #735b43;
+  padding-bottom: 4px;
+}
+.blend-sugar {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  border-top: 1px solid #795c3e40;
+  padding-top: 14px;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.blend-sugar small {
+  font-size: 10px;
+}
+.blend-note {
+  font-size: 9px;
+  color: #735b43;
+  margin: 9px 0 17px;
+}
+.recipe-ticket .serve-button {
+  background: transparent;
+  color: #402c20;
+  padding: 0;
+  border-top: 1px solid #795c3e40;
+  border-bottom: 1px solid #795c3e40;
+}
+.recipe-ticket .serve-button:hover:not(:disabled) {
+  background: #eee3d230;
+}
+.is-served .recipe-ticket {
+  transform: none;
+  box-shadow: none;
+}
+.preset-dock {
+  height: 238px;
+}
+.worktable {
+  bottom: 238px;
+}
+.dock-heading {
+  height: 35px;
+}
+.preset {
+  flex-direction: column;
+  height: 194px;
+  min-width: 165px;
+  padding: 3px 16px 9px;
+  gap: 0;
+  text-align: center;
+}
+.preset-title {
+  font-size: 23px;
+  line-height: 1.1;
+}
+.mini-cup {
+  width: 188px;
+  max-width: 100%;
+  height: 142px;
+  margin: -2px auto -5px;
+  border-radius: 0;
+  mask-image: radial-gradient(ellipse at center, #000 45%, transparent 73%);
+}
+.mini-cup img {
+  position: absolute;
+  width: 150%;
+  height: auto;
+  left: -25%;
+  top: 50%;
+  transform: translateY(-46.3%);
+}
+.mini-cup > span {
+  left: 16.85%;
+  top: 50%;
+  width: 65.4%;
+  height: auto;
+  aspect-ratio: 43.6 / 44.4;
+  transform: translateY(-50%);
+}
+.preset-detail {
+  font-size: 9px;
+  color: #70573e;
+  white-space: nowrap;
+  line-height: 1.4;
+}
+.preset .composition-small {
+  width: 104px;
+  max-width: 100%;
+  height: 3px;
+  margin: 6px auto 0;
+  flex: none;
+}
+@media (min-width: 761px) and (max-height: 800px) {
+  .recipe-ticket {
+    top: 99px;
+    padding: 0;
+  }
+  .recipe-ticket .blend-title {
+    font-size: 33px;
+  }
+  .blend-volume {
+    margin: 14px 0 11px;
+  }
+  .blend-readout {
+    height: 155px;
+    margin-bottom: 12px;
+    gap: 15px;
+  }
+  .blend-ingredients {
+    gap: 4px;
+  }
+  .blend-ingredients dt {
+    font-size: 10px;
+  }
+  .blend-ingredients dd {
+    font-size: 12px;
+    margin-top: 3px;
+  }
+  .blend-sugar {
+    padding-top: 9px;
+  }
+  .blend-note {
+    margin: 7px 0 10px;
+  }
+  .preset-dock {
+    height: 214px;
+  }
+  .worktable {
+    bottom: 214px;
+  }
+  .preset {
+    height: 170px;
+  }
+  .mini-cup {
+    width: 176px;
+    height: 124px;
+  }
+  .preset-title {
+    font-size: 21px;
+  }
+}
+@media (max-width: 1050px) and (min-width: 761px) {
+  .recipe-ticket {
+    width: 176px;
+    right: 22px;
+  }
+  .blend-readout {
+    gap: 12px;
+  }
+}
+@media (max-width: 760px) {
+  .worktable {
+    bottom: auto;
+  }
+  .recipe-ticket {
+    width: auto;
+    padding: 0;
+  }
+  .recipe-ticket .blend-title {
+    font-size: 31px;
+    line-height: 1.1;
+    margin: 0 0 9px;
+  }
+  .blend-name {
+    font-size: 10px;
+  }
+  .blend-volume {
+    margin: 20px 0 16px;
+  }
+  .blend-volume strong {
+    font-size: 28px;
+  }
+  .blend-readout {
+    height: 190px;
+    gap: 12px;
+  }
+  .blend-meter {
+    flex-basis: 22px;
+  }
+  .blend-ingredients {
+    gap: 6px;
+  }
+  .blend-ingredients dt {
+    font-size: 9px;
+  }
+  .blend-ingredients dd {
+    font-size: 12px;
+  }
+  .blend-ingredients dd small {
+    font-size: 8px;
+  }
+  .blend-sugar {
+    font-size: 10px;
+  }
+  .blend-note {
+    font-size: 8px;
+  }
+  .preset-dock {
+    height: auto;
+    padding: 0 18px 9px;
+  }
+  .preset {
+    flex: 0 0 148px;
+    min-width: 148px;
+    height: 170px;
+  }
+  .preset-title {
+    font-size: 23px;
+  }
+  .mini-cup {
+    width: 140px;
+    height: 118px;
+  }
+  .preset-detail {
+    font-size: 8px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .blend-meter > span {
+    transition: none;
+  }
+}
+
+.blend-ingredients.is-dense {
+  gap: 6px;
+}
+.blend-ingredients.is-dense dt {
+  font-size: 10px;
+  line-height: 12px;
+}
+.blend-ingredients.is-dense dd {
+  font-size: 11px;
+  line-height: 12px;
+  margin-top: 0;
+}
+@media (max-width: 760px) {
+  .blend-ingredients.is-dense dt {
+    font-size: 9px;
+  }
+}
+
+@media (max-width: 760px) {
+  .experience:not(.cup-focus) .photograph {
+    margin-bottom: 34px;
+  }
+}

@@ -5,11 +5,11 @@ colors:
   stone: "#ccbaa3"
   stone-light: "#dacbb6"
   foreground: "#3b3027"
-  paper: "#f8f4e9ed"
   dock: "#f3ecdfeb"
-  action: "#473022"
-  action-hover: "#65432d"
-  action-text: "#fbf5e8"
+  action-ink: "#402c20"
+  action-hover: "#eee3d230"
+  capacity-track: "#a28c7024"
+  blend-secondary: "#735b43"
   focus: "#6a472e"
   froth-panel: "#f4ecdedb"
   froth-ink: "#493526"
@@ -35,10 +35,10 @@ typography:
     letterSpacing: "-1.2px"
   title:
     fontFamily: "Georgia, serif"
-    fontSize: "30px"
+    fontSize: "38px"
     fontWeight: 400
-    lineHeight: 1.08
-    letterSpacing: "-0.8px"
+    lineHeight: 1.05
+    letterSpacing: "-1.1px"
   body:
     fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif"
     fontSize: "12px"
@@ -50,6 +50,8 @@ rounded:
   flat: "0px"
   swatch: "4px"
   liquid: "50%"
+  meter: "3px"
+  ingredient-dot: "1px"
 spacing:
   small: "8px"
   control: "12px"
@@ -59,19 +61,24 @@ spacing:
   desktop-edge: "36px"
 components:
   serve-button:
-    backgroundColor: "{colors.action}"
-    textColor: "{colors.action-text}"
+    backgroundColor: "transparent"
+    textColor: "{colors.action-ink}"
     rounded: "{rounded.flat}"
-    padding: "0 13px"
+    padding: "0"
     height: "45px"
     width: "100%"
   serve-button-hover:
     backgroundColor: "{colors.action-hover}"
-  recipe-ticket:
-    backgroundColor: "{colors.paper}"
+  blend-panel:
+    backgroundColor: "transparent"
     rounded: "{rounded.flat}"
-    padding: "20px 19px 12px"
-    width: "223px"
+    padding: "0"
+    width: "204px"
+  capacity-meter:
+    backgroundColor: "{colors.capacity-track}"
+    rounded: "{rounded.meter}"
+    width: "29px"
+    height: "210px"
   froth-options:
     backgroundColor: "{colors.froth-panel}"
     textColor: "{colors.froth-ink}"
@@ -80,7 +87,7 @@ components:
   preset-dock:
     backgroundColor: "{colors.dock}"
     padding: "0 36px"
-    height: "158px"
+    height: "218px"
 ---
 
 # Design System: Kopi / Teh
@@ -89,15 +96,16 @@ components:
 
 **Creative North Star: "The photographic mixing table"**
 
-The approved MagicPath A composition places a dominant ivory cup between an ingredient shelf and a paper recipe receipt, with familiar drinks along the bottom. It retains Befrothed's warm stone, photographic texture, quiet serif and tactile liquid. Interface elements are compact and secondary to the cup; they now make the pouring, recipe and serving actions explicit.
+The user-approved **H direction** (13:49 SGT, 11 October 2026) refines the MagicPath A mixing table: a dominant ivory cup sits between the ingredient shelf and a freestanding Your blend readout, with a photographic recipe carousel along the bottom. It retains Befrothed's warm stone, photographic texture, quiet serif and tactile liquid. Interface elements are compact and secondary to the cup; they now make the pouring, recipe and serving actions explicit.
 
-The user-requested focus mode removes the mixing table while retaining the same cup and recipe. A small toolbar can reveal ingredients, serve, or resume mixing. This document records **0.2.0 — 11 October 2026**, implemented in local source on 11 October 2026; final QA and packaging remain in progress. It does not establish deployment or device acceptance. The reviewed desktop and mobile captures show the cup composition. Refreshed mobile captures also confirm the visible About action, open cultural-notes dialog and three-column ingredient tray. Those prior screenshots establish the surrounding layout, not the latest froth/depth implementation or native-device performance. Root has since exercised native browser dragging on the restored original surface and inspected the new recessed pool; these are scoped checks, not final acceptance.
+The user-requested focus mode removes surrounding controls while retaining the same cup and recipe. A small toolbar can reveal ingredients, serve or resume mixing. This document records **0.3.0 — Unreleased**, including H source currently being prepared. H is explicitly approved; its final validation and publication are pending. Prior 0.2.0 desktop/mobile and original-surface checks do not certify this new layout. Native-device performance is not established.
 
 **Key Characteristics:**
 - Original finished Befrothed surface ready to stir, framed by photographic ceramic and stone.
 - Deliberate cup replacement, visible rise/drain and artistic depth/layer cues.
 - Editorial serif headings paired with small, quiet sans-serif controls.
-- A flat paper receipt and horizontal recipe carousel around one dominant cup.
+- A freestanding blend readout with a fixed-capacity vertical bar.
+- Recipe names above larger centred photographic cups, with details below.
 - Optional cup-only focus with a compact ingredient tray.
 
 ## Colors
@@ -106,31 +114,33 @@ Warm mineral neutrals support brown coffee and amber tea. The palette is deliber
 
 ### Primary
 
-The action brown identifies the serve control; its lighter hover shade provides feedback. Coffee and tea are both ingredient swatches and inputs to the illustrative beverage colour model.
+The serve action uses brown text between fine rules and a faint cream hover wash. It no longer uses a solid brown rectangle. Coffee and tea are both ingredient swatches and inputs to the illustrative beverage colour model.
 
 ### Secondary
 
-Water, condensed milk, evaporated milk and sugar each retain their ingredient colour across shelf swatches, receipt dots and composition bars. Sugar has a ledger entry in grams and is excluded from the liquid composition bar.
+Water, condensed milk, evaporated milk and sugar each retain their ingredient colour across shelf swatches, blend dots and composition bars. Sugar has a ledger entry in grams and is excluded from the liquid composition bar.
 
 ### Neutral
 
-Stone and stone-light form the radial page background. Translucent paper and dock surfaces sit over the photograph without enclosing every control in a card. Foreground brown replaces hard black. The focus colour marks keyboard access.
+Stone and stone-light form the radial page background. The translucent dock supports the carousel while the blend readout sits directly on the stone without a paper card or shadow. A faint neutral capacity track makes unfilled volume visible. Foreground brown replaces hard black. The focus colour marks keyboard access.
 
-**The Ingredient Identity Rule.** Keep each ingredient's colour consistent across controls, receipt and recipe previews. Resulting liquid colours are artistic mixtures, not calibrated beverage measurements.
+**The Ingredient Identity Rule.** Keep each ingredient's colour consistent across controls, blend readout and recipe previews. Resulting liquid colours are artistic mixtures, not calibrated beverage measurements.
 
 ## Typography
 
 Georgia supplies the wordmark, main invitation, receipt title and preset names; Helvetica Neue, Helvetica and Arial supply controls and supporting text. Italic emphasis adds warmth without introducing another font.
 
-The normative desktop roles are in the frontmatter. Preset names use Georgia at 24px/1.1 with -0.7px tracking. The modal heading uses 34px/1.1 with -1px tracking. Supporting interface sizes range from 8–12px; modal body copy is 13px/1.6. Receipt quantities use tabular numerals. At 760px and below the wordmark becomes 25px, the invitation 31px and receipt title 25px; the narrowest labels reach 8px. These small sizes are an observed implementation constraint, not a general accessibility endorsement.
+The normative desktop roles are in the frontmatter. Your blend uses the title role with italic emphasis; current liquid volume uses Georgia at 32px/1 with -0.8px tracking. Carousel names use Georgia at 23px/1.1; details use 9px sans serif. Ingredient amounts use 14px tabular numerals, units 9px and whole-number shares 10px. The modal heading retains 34px/1.1 with -1px tracking and body 13px/1.6.
+
+At desktop heights of 800px or less, the blend title becomes 33px, amount text 12px and carousel names 21px. At 760px and below, the title is 31px/1.1, total volume 28px, ingredient names 9px, amounts 12px and shares 8px. These compact source sizes are observed design choices, not a general accessibility endorsement.
 
 ## Layout
 
-Desktop uses a 100svh stage with a 680px minimum height. The masthead has 26px vertical and 36px horizontal padding. The ingredient shelf is 190px wide at the left edge; the receipt is 223px wide at the right. The worktable reserves 158px for the bottom carousel. The scene uses `min(86vw, 116svh)` and aligns its image and liquid window from the same asset manifest.
+Desktop uses a 100svh stage with a 680px minimum height. The masthead retains 26px vertical / 36px horizontal padding and the ingredient shelf remains 190px wide. H's transparent blend panel is 204px wide at the right, normally 140px from the top. Its 210px-high readout pairs a 29px capacity bar with ingredient amounts using an 18px gap. The worktable reserves 218px for the carousel dock; each stacked preset is 174px high with a minimum width of 165px and a centred 122px cup.
 
-At 761–1050px, side edges reduce to 24px, shelf to 150px and receipt to 200px. At desktop heights of 800px or less, shelf rows tighten to 40px, receipt padding tightens and the invitation becomes 34px. At heights of at least 820px and widths of at least 900px, shelf rows expand to 58px and the dock to 170px.
+At desktop heights of 800px or less, the blend panel starts at 99px, readout height is 155px, dock height 194px, preset height 150px and miniature cup 104px. At widths 761–1050px, the blend panel is 176px wide with a 22px right edge and 12px readout gap. The inherited cup image retains shared registration with its liquid window.
 
-At 760px and below, the page becomes a scrolling document. A 72px masthead leads a 370px cup region; ingredients and receipt sit in two columns below, using 18px side padding and a 20px gap. The carousel follows them in normal flow and scrolls horizontally. At 380px and below, the cup region reduces to 330px, edges to 14px and gap to 12px. The entire recipe is intentionally below the first phone viewport; this is not a single-screen mobile table.
+At 760px and below, the page remains a scrolling document: a 72px masthead, a 370px cup region, then the ingredient shelf and freestanding blend readout in two columns with 18px edges and a 20px gap. The blend bar becomes 22px wide within a 190px-high readout. The carousel stays horizontally scrollable in normal flow, with automatic dock height, 148px-wide / 170px-high choices and 118px cups. At widths of 380px and below, the inherited cup region reduces to 330px, edges to 14px and grid gap to 12px. The complete mobile table continues below the first viewport.
 
 The new froth tools sit within the cup workspace, separate from the approved left selector and carousel. Their action row sits 48px from the desktop photograph bottom (37px mobile), or 117px in desktop focus mode (136px mobile focus). Buttons use 11px text and a 30px minimum height on desktop, 10px text and a 36px minimum height on mobile. The revealed options panel wraps with 6px vertical / 18px horizontal gaps and a subtle 4px radius.
 
@@ -138,7 +148,7 @@ Focus mode returns to a 100svh stage. The desktop scene grows to `min(128vw, 120
 
 ## Elevation & Depth
 
-Most depth comes from the inherited photograph: ivory rim, handle, saucer, stone texture and directional shadow. Interface surfaces stay flat and square. The receipt has a faint ambient shadow (`0 5px 30px #3b241b08`); serving rotates it 1.5 degrees and increases its shadow (`5px 14px 35px #50302118`). Mobile serving uses a 1-degree rotation. The focus toolbar and ingredient tray use 15px backdrop blur with restrained shadows. The native notes dialog has a dark translucent backdrop with 7px blur.
+Most depth comes from the inherited photograph: ivory rim, handle, saucer, stone texture and directional shadow. H removes the paper receipt's background, padding, shadow and served-state rotation. The blend data sits directly on the table; its capacity bar is a flat readout, not a thermometer object. The focus toolbar and ingredient tray retain 15px backdrop blur with restrained shadows; the native notes dialog has a dark translucent backdrop with 7px blur.
 
 The new-cup compositor additionally reveals a shaded ceramic well, recessed liquid pool and surface layers as the visible fill changes. These are artistic depth cues; they do not establish physical ingredient stratification. The original finished artwork retains its complete presentation even though its editable ledger is an illustrative 180 ml.
 
@@ -146,7 +156,7 @@ The new-cup compositor additionally reveals a shaded ceramic well, recessed liqu
 
 ## Shapes
 
-Paper, receipt, dock and primary action controls have square corners. The small translucent froth-options panel uses a 4px radius, sharing the restrained rounding already used for swatches. Circles belong to the cup, liquid window, miniature cups and receipt ingredient dots. Shelf swatches are narrow rounded strokes (8 × 25px desktop, 6 × 22px mobile). Fine translucent brown rules divide ingredients, receipt lines and presets. Selected presets use a brown bottom rule rather than a surrounding pill.
+The blend readout has no enclosing card. The dock and main action controls retain square forms; the capacity bar uses a restrained 3px radius and ingredient markers 1px. The small translucent froth-options panel uses a 4px radius, sharing the restrained rounding already used for swatches. Circles belong to the cup, liquid window, miniature cups and blend ingredient dots. Shelf swatches are narrow rounded strokes (8 × 25px desktop, 6 × 22px mobile). Fine translucent brown rules divide the ingredient shelf, separate sugar and serve action, and separate preset choices. Selected presets use a brown bottom rule rather than a surrounding pill.
 
 ## Components
 
@@ -166,13 +176,15 @@ A stream appears during pours; sugar uses a dotted falling treatment and water r
 
 Six divided rows support pointer holds and keyboard activation. Hover or pouring adds a translucent cream background and a 6px left inset; active swatches receive a soft ring. Pointer capture and release/cancel/blur handling end holds. Loading, preparation, serving and capacity states disable relevant actions. Liquid capacity is 300ml; separately added sugar caps at 30g. Undo restores a prior recipe through the same renderer pathway.
 
-### Recipe receipt and serve
+### Your blend readout and serve
 
-The receipt labels the initial state Original latte / Illustrative starting mix and explicitly disclaims a recipe inferred from the image. After ordinary ingredient editing or preset selection, it names the current ingredient family. It separates liquid ml from added sugar g and displays all six ledger entries. Serve preserves the assembled recipe, disables stirring and presents Make another / Keep mixing states. Empty cup is an understated underlined action. Errors replace the serve action with Reload cup. These states must remain truthful to the stored ledger.
+A minimal **Your blend.** heading sits above the drink name and current liquid amount **/ 300 ml**. The unboxed vertical capacity meter always uses a **300 ml denominator**: an ingredient's height is its ml divided by 300, and unfilled space stays visible. Beside it, only present liquid ingredients appear with their ml and rounded percentage of the **current total liquid**, not capacity. These are deliberately different measures. Rounding may make displayed shares total 99% or 101%; zero liquid uses an empty-cup message rather than a percentage.
+
+Added sugar is separate below a fine rule and never changes liquid bar height or shares. Original latte retains the Illustrative starting mix note; its 180 ml assignment still makes no inference about the artwork's real recipe. The serve control uses text, transparent background and top/bottom rules, preserving error/reload, serve, Make another and Keep mixing behaviour without card lift or rotation. Bar segments transition in 200ms with `cubic-bezier(0.16, 1, 0.3, 1)`; reduced motion removes that transition.
 
 ### Preset carousel
 
-Kopi-O, Kopi, Kopi-C, Teh and Empty cup use photographic miniatures, short descriptions and composition bars. The selected preset carries a bottom rule and Yours label. Desktop items have a 190px minimum width; mobile items use 195px. Scroll snapping, horizontal swiping and arrow controls support overflow. The four cultural recipes and the approved photographic carousel remain unchanged. Preset preparation follows deliberate draining and visibly pours ingredients into the shared cup; Original latte is a separate surface restore control.
+Each choice stacks its **name above a larger centred photographic cup**, followed by the short ingredient description and a small horizontal composition strip. The four cultural recipes and Empty cup are unchanged; selected choices retain the bottom rule and tinted state. The previous side-by-side copy layout and Yours/Try it corner labels no longer describe the source. Horizontal scrolling, snapping and arrow controls remain. Choosing a preset still deliberately drains and prepares the shared cup.
 
 ### Focus toolbar and tray
 
@@ -187,8 +199,10 @@ The language of a cup becomes About on mobile and opens a native modal dialog. A
 ### Do:
 - **Do** preserve the exact inherited finished opening, warm stone and shared image/liquid registration.
 - **Do** make empty/preset changes deliberate and keep the original artwork separate from the illustrative recipe assignment.
-- **Do** keep froth shaping separate from ingredient quantities and preserve the approved selector and carousel.
-- **Do** keep ingredient colours and units consistent across the shelf, receipt, carousel and focus tray.
+- **Do** keep froth shaping separate from ingredient quantities and preserve the approved selector.
+- **Do** use 300 ml for capacity-bar height and current liquid total for adjacent ingredient shares; keep sugar separate.
+- **Do** place carousel names above centred photographic cups and details below, as approved in H.
+- **Do** keep ingredient colours and units consistent across the shelf, blend readout, carousel and focus tray.
 - **Do** preserve the current drink when entering or leaving focus mode.
 - **Do** distinguish source evidence, rendered screenshots and native-device testing.
 
@@ -197,5 +211,6 @@ The language of a cup becomes About on mobile and opens a native modal dialog. A
 - **Don't** describe synthetic artwork as a camera photograph or illustrative recipes as standard stall ratios.
 - **Don't** claim sensory, nutritional, fluid-physics or chemistry accuracy from the visual model.
 - **Don't** infer the original photograph's recipe or physical fill from its illustrative 180 ml ledger.
-- **Don't** describe G as selected or integrated; its blend-panel choice remains separate and pending.
+- **Don't** retain the superseded claim that G selection is pending: H is explicitly approved.
+- **Don't** claim v0.3.0 is deployed before exact publication evidence is recorded.
 - **Don't** treat desktop or emulated mobile captures as proof of native phone performance, sustained frame rate or physical touch latency.

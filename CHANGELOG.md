@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.3.0 — Unreleased
+
+User approved direction **H** at approximately **13:49 SGT on 11 October 2026**. This entry describes the source being prepared; validation and publication are pending. The last confirmed deployed release remains v0.2.0 until exact new evidence is recorded.
+
+### Changed
+
+- Replace the paper recipe ticket with a freestanding **Your blend** readout: minimal serif heading, current liquid ml against 300 ml capacity, a flat vertical capacity bar, ingredient amounts/shares and separately added sugar.
+- Keep the bar's denominator fixed at **300 ml**. A 180 ml cup fills 60% of its height; unused capacity remains visible. Ingredient percentages alongside it are shares of the **current liquid total**, a different denominator. Sugar grams enter neither bar height nor liquid percentages.
+- Show only present liquid ingredients in the readout, with an explicit empty-cup message when there is no liquid. Percentage labels are rounded whole numbers and need not sum to exactly 100%.
+- Recompose each photographic carousel choice with its name above a larger centred cup and its description/composition below. The four recipe definitions and Empty cup remain unchanged.
+- Keep the serve action flat and ruled, without the prior filled paper-ticket treatment. Preserve the original finished opening, six-row ingredient controls, focus mode and bounded froth tools.
+
+### Validation boundary
+
+H is approved and implemented in the source under preparation. No v0.3.0 deployment, source commit, final QA result or completed submission package is claimed by this unreleased entry. Earlier v0.2.0 checks are retained under that release and do not certify the new layout.
+
 ## 0.2.0 — 11 October 2026
 
 ### Changed
