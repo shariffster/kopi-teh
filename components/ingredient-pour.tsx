@@ -84,20 +84,22 @@ export function IngredientPour({ kind }: { kind: IngredientKind | null }) {
         <g className="falling-liquid">
           <path
             className="stream-shadow"
-            d="M374 203 C394 294 417 365 421 450"
+            d="M287 42 C321 181 408 331 424 451"
           />
           <path
             className="stream-body"
             d={
-              milk
-                ? 'M371 201 C388 296 424 355 421 448 L415 450 C410 365 378 302 362 205 Z'
-                : 'M371 201 C391 312 416 360 421 449 L417 450 C410 360 381 309 364 204 Z'
+              shown === 'condensed'
+                ? 'M287 38 C323 173 408 326 424 448 L416 451 C394 331 306 180 273 42 Z'
+                : shown === 'evaporated'
+                  ? 'M285 39 C319 177 405 330 423 449 L417 451 C397 334 310 182 275 41 Z'
+                  : 'M283 39 C318 179 403 331 422 449 L418 450 C398 334 311 183 277 41 Z'
             }
             fill={`url(#${id('stream')})`}
           />
           <path
             className="stream-highlight"
-            d="M367 206 C387 311 413 365 419 446"
+            d="M280 42 C315 180 402 332 420 447"
             stroke={shine}
           />
         </g>
@@ -166,8 +168,8 @@ export function IngredientPour({ kind }: { kind: IngredientKind | null }) {
         >
           <image
             href="/assets/pouring/pitcher-v1.png"
-            x="48.35"
-            y="-24.25"
+            x="-38.65"
+            y="-187.25"
             width="350"
             height="350"
           />

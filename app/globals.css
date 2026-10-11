@@ -1579,9 +1579,13 @@ h1 em {
   transform-origin: 370px 205px;
   animation: source-arrive 220ms cubic-bezier(0.2, 0.75, 0.2, 1) both;
 }
+.pour-source.pouring-jug {
+  transform-origin: 280px 40px;
+  animation: jug-arrive 140ms ease-out both;
+}
 .falling-liquid {
-  animation: liquid-arrive 140ms 100ms ease-out both;
-  transform-origin: 370px 205px;
+  animation: liquid-arrive 180ms 140ms ease-out both;
+  transform-origin: 280px 40px;
 }
 .stream-shadow {
   fill: none;
@@ -1597,11 +1601,15 @@ h1 em {
   opacity: 0.35;
   stroke-linecap: round;
   stroke-dasharray: 52 87;
-  animation: stream-travel 700ms linear infinite;
+  animation: stream-travel 590ms linear infinite;
 }
 .pour-condensed .stream-highlight {
   animation-duration: 1100ms;
   stroke-width: 2.5;
+}
+.pour-evaporated .stream-highlight {
+  animation-duration: 760ms;
+  opacity: 0.5;
 }
 .pour-water .stream-body {
   opacity: 0.46;
@@ -1623,6 +1631,9 @@ h1 em {
 }
 .is-leaving .pour-source {
   animation: source-leave 360ms ease-in both;
+}
+.is-leaving .pouring-jug {
+  animation: jug-leave 170ms 190ms ease-in both;
 }
 .is-leaving .falling-liquid {
   animation: liquid-leave 190ms ease-in both;
@@ -1647,6 +1658,26 @@ h1 em {
   }
 }
 @keyframes source-leave {
+  from {
+    opacity: 1;
+    transform: translate(0, 0) rotate(0deg);
+  }
+  to {
+    opacity: 0;
+    transform: translate(-24px, -42px) rotate(-20deg);
+  }
+}
+@keyframes jug-arrive {
+  from {
+    opacity: 0;
+    transform: translate(-10px, -12px) rotate(-4deg);
+  }
+  to {
+    opacity: 1;
+    transform: translate(0, 0) rotate(0deg);
+  }
+}
+@keyframes jug-leave {
   from {
     opacity: 1;
     transform: translate(0, 0) rotate(0deg);
